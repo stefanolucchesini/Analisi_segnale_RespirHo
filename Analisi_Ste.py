@@ -1,7 +1,7 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-chunksize = 128  # number of samples taken for computing a chunk of data
+chunksize = 128  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 
 import warnings
 
@@ -19,8 +19,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_C.txt', sep=",|:", header=None, engine='python')
-
+data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -126,6 +125,7 @@ for i in range(max_value):
 
 data_2 = data_2.iloc[:max_value * 256]
 
+print(data_3)
 for i in range(max_value):
     for j in range(256):
         if data_3['nthvalue'][j + i * 256] != j:
@@ -145,11 +145,10 @@ data_1 = data_1[:n_chunks * chunksize]
 data_2 = data_2[:n_chunks * chunksize]
 data_3 = data_3[:n_chunks * chunksize]
 
-tor_quat = Quaternion()
-Tor_pose_quat = Quaternion()
-tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
+pca = PCA(n_components=1)
 
 for c in range(n_chunks):
+    # THORAX DEVICE
     pezzo11 = data_1.loc[c * chunksize:(c + 1) * chunksize - 1, '1']
     pezzo11.interpolate(method='pchip', inplace=True)
     pezzo11.fillna(method='bfill', inplace=True)
@@ -166,12 +165,34 @@ for c in range(n_chunks):
     pezzo14.interpolate(method='pchip', inplace=True)
     pezzo14.fillna(method='bfill', inplace=True)
 
-    mean11 = 0
-    mean12 = 0
-    mean13 = 0
-    mean14 = 0
+    mean11, mean12, mean13, mean14 = 0, 0, 0, 0
+
+    tor_quat = Quaternion()
+    Tor_pose_quat = Quaternion()
+    t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
+    # REFERENCE DEVICE
+    pezzo31 = data_3.loc[c * chunksize:(c + 1) * chunksize - 1, '1']
+    pezzo31.interpolate(method='pchip', inplace=True)
+    pezzo31.fillna(method='bfill', inplace=True)
+
+    pezzo32 = data_3.loc[c * chunksize:(c + 1) * chunksize - 1, '2']
+    pezzo32.interpolate(method='pchip', inplace=True)
+    pezzo32.fillna(method='bfill', inplace=True)
+
+    pezzo33 = data_3.loc[c * chunksize:(c + 1) * chunksize - 1, '3']
+    pezzo33.interpolate(method='pchip', inplace=True)
+    pezzo33.fillna(method='bfill', inplace=True)
+
+    pezzo34 = data_3.loc[c * chunksize:(c + 1) * chunksize - 1, '4']
+    pezzo34.interpolate(method='pchip', inplace=True)
+    pezzo34.fillna(method='bfill', inplace=True)
+
+    mean31, mean32, mean33, mean34 = 0, 0, 0, 0
+    ref_quat = Quaternion()
+    Ref_pose_quat = Quaternion()
 
     for i in range(chunksize):
+        # DEVICE 1 (THORAX)
         if pezzo11[i + c * chunksize] > 127:
             pezzo11[i + c * chunksize] -= 256
             pezzo11[i + c * chunksize] /= 127
@@ -196,24 +217,66 @@ for c in range(n_chunks):
         else:
             pezzo14[i + c * chunksize] /= 127
         mean14 += pezzo14[i + c * chunksize]
-        #qua dentro calcola il quaternione
+        # DEVICE 3 (REFERENCE)
+        if pezzo31[i + c * chunksize] > 127:
+            pezzo31[i + c * chunksize] -= 256
+            pezzo31[i + c * chunksize] /= 127
+        else:
+            pezzo31[i + c * chunksize] /= 127
+        mean31 += pezzo31[i + c * chunksize]
+        if pezzo32[i + c * chunksize] > 127:
+            pezzo32[i + c * chunksize] -= 256
+            pezzo32[i + c * chunksize] /= 127
+        else:
+            pezzo32[i + c * chunksize] /= 127
+        mean32 += pezzo32[i + c * chunksize]
+        if pezzo33[i + c * chunksize] > 127:
+            pezzo33[i + c * chunksize] -= 256
+            pezzo33[i + c * chunksize] /= 127
+        else:
+            pezzo33[i + c * chunksize] /= 127
+        mean33 += pezzo33[i + c * chunksize]
+        if pezzo34[i + c * chunksize] > 127:
+            pezzo34[i + c * chunksize] -= 256
+            pezzo34[i + c * chunksize] /= 127
+        else:
+            pezzo34[i + c * chunksize] /= 127
+        mean34 += pezzo34[i + c * chunksize]
+        # qua dentro calcola il quaternione
         tor_quat = Quaternion(pezzo11[i + c * chunksize], pezzo12[i + c * chunksize], pezzo13[i + c * chunksize],
                               pezzo14[i + c * chunksize])
-        Tor_pose_quat = Quaternion(mean11/(i+1), mean12/(i+1), mean13/(i+1), mean14/(i+1))  #problema: questa media mobile non mi convince
+        Tor_pose_quat = Quaternion(mean11 / (i + 1), mean12 / (i + 1), mean13 / (i + 1),
+                                   mean14 / (i + 1))  # problema: questa media mobile non mi convince
         tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
-        tor_pose.loc[i + c * chunksize] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-    #Fare la stessa cosa per device 2 e 3
-    plt.ylim([-0.3, 1])
-    plt.subplot(2, 1, 1)
-    plt.title('Quaternions 1,2,3,4 of device 1')
+        tor_pose = Quaternion(tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3])
+        ref_quat = Quaternion(pezzo31[i + c * chunksize], pezzo32[i + c * chunksize], pezzo33[i + c * chunksize],
+                              pezzo34[i + c * chunksize])
+        Ref_pose_quat = Quaternion(mean31 / (i + 1), mean32 / (i + 1), mean33 / (i + 1), mean34 / (i + 1))
+        ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+        ref_pose = Quaternion(ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3])
+        t1_row = tor_pose * ref_pose.conjugate  # thorax with respect to the reference
+        t1.loc[i + c * chunksize] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+
+    # Fare la stessa cosa per device 2
+
+    plt.subplot(3, 1, 1)
+    plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
     plt.plot(pezzo11)
     plt.plot(pezzo12)
     plt.plot(pezzo13)
     plt.plot(pezzo14)
-    plt.subplot(2, 1, 2)
-    plt.title('Tor_pose (unreferenced)')
-    plt.plot(tor_pose)
-    plt.pause(0.01)
+
+    plt.subplot(3, 1, 2)
+    plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
+    plt.plot(pezzo31)
+    plt.plot(pezzo32)
+    plt.plot(pezzo33)
+    plt.plot(pezzo34)
+
+    plt.subplot(3, 1, 3)
+    plt.title('Thoracic component (t1) w/o MA(97)')
+    plt.plot(t1)
+    plt.pause(0.001)
 
 
 plt.show()
