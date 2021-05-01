@@ -1,7 +1,9 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-chunksize = 128  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+chunksize = 250  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+SgolayWindowPCA = 31
+skip_chunks = 0  # number of intial chunks to skip
 
 import warnings
 
@@ -75,14 +77,8 @@ print("Numero di campioni acquisiti da unita' 1: ", len(data_1))
 print("Numero di campioni acquisiti da unita' 2: ", len(data_2))
 print("Numero di campioni acquisiti da unita' 3: ", len(data_3))
 
-if len(data_3) > len(data_1) and len(data_3) > len(data_2):
-    max_value = math.floor(len(data_3) / 256)
-    # max_value = math.ceil(len(data_3) / 256)
-elif len(data_1) > len(data_2) and len(data_1) > len(data_3):
-    max_value = math.floor(len(data_1) / 256)
-    # max_value = math.ceil(len(data_1) / 256)
-else:
-    max_value = math.floor((len(data_2)) / 256)
+max_value = math.floor((max(len(data_1['1']), len(data_2['1']), len(data_3['1']))) / 256)
+
 # conversion from hexadecimal to decimal
 data_1['nthvalue'] = data_1['nthvalue'].apply(int, base=16)
 data_2['nthvalue'] = data_2['nthvalue'].apply(int, base=16)
@@ -146,8 +142,24 @@ data_2 = data_2[:n_chunks * chunksize]
 data_3 = data_3[:n_chunks * chunksize]
 
 pca = PCA(n_components=1)
+t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
+tor_quat = Quaternion()
+Tor_pose_quat = Quaternion()
+
+ref_quat = Quaternion()
+Ref_pose_quat = Quaternion()
+FuseT_1 = []
+
+fdev = (max(len(data_1['1']), len(data_2['1']), len(data_3['1']))) / 300
+
+# PARTE ITERATIVA DEL CODICE
 
 for c in range(n_chunks):
+
+    if skip_chunks:
+        skip_chunks -= 1
+        continue
+
     # THORAX DEVICE
     pezzo11 = data_1.loc[c * chunksize:(c + 1) * chunksize - 1, '1']
     pezzo11.interpolate(method='pchip', inplace=True)
@@ -167,9 +179,6 @@ for c in range(n_chunks):
 
     mean11, mean12, mean13, mean14 = 0, 0, 0, 0
 
-    tor_quat = Quaternion()
-    Tor_pose_quat = Quaternion()
-    t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
     # REFERENCE DEVICE
     pezzo31 = data_3.loc[c * chunksize:(c + 1) * chunksize - 1, '1']
     pezzo31.interpolate(method='pchip', inplace=True)
@@ -188,8 +197,6 @@ for c in range(n_chunks):
     pezzo34.fillna(method='bfill', inplace=True)
 
     mean31, mean32, mean33, mean34 = 0, 0, 0, 0
-    ref_quat = Quaternion()
-    Ref_pose_quat = Quaternion()
 
     for i in range(chunksize):
         # DEVICE 1 (THORAX)
@@ -256,8 +263,21 @@ for c in range(n_chunks):
         ref_pose = Quaternion(ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3])
         t1_row = tor_pose * ref_pose.conjugate  # thorax with respect to the reference
         t1.loc[i + c * chunksize] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+        # Fare la stessa cosa per device 2
 
-    # Fare la stessa cosa per device 2
+    #  Fuori dall'iterazione DENTRO il chunk
+    FuseT_1.extend(pca.fit_transform(t1.loc[c * chunksize:(c + 1) * chunksize]))  # PCA del c-esimo chunk
+    EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
+    # rilevazione picchi
+    diff_T = max(EstimSmoothT) - min(EstimSmoothT)
+    thr_T = diff_T * 5 / 100
+    Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
+    Index_T = Index_T[0]
+    fStimVec_T = []
+    for i in range(len(Index_T) - 1):
+        intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
+        fstim = 1 / intrapeak
+        fStimVec_T.append(fstim)
 
     plt.subplot(3, 1, 1)
     plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
@@ -274,9 +294,13 @@ for c in range(n_chunks):
     plt.plot(pezzo34)
 
     plt.subplot(3, 1, 3)
-    plt.title('Thoracic component (t1) w/o MA(97)')
-    plt.plot(t1)
+    # plt.title('Thoracic component (t1) w/o MA(97)')
+    # plt.plot(t1)
+    # plt.title('First PCA Thorax component')
+    # plt.plot(FuseT_1)
+    plt.title('First PCA Thorax component (FILTERED, positive peaks highlighted)')
+    plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+    plt.plot(EstimSmoothT)
     plt.pause(0.001)
-
 
 plt.show()

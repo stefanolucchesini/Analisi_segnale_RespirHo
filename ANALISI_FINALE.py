@@ -30,7 +30,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_C.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -520,12 +520,12 @@ fStimstd_T = statistics.stdev(fStimVec_T)
 lowThreshold_T = max(f_threshold_min, (fStimMean_T-fStimstd_T))  # creation of the thorax threshold
 f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=300, noverlap=50, nfft=512, detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
 
-# plt.figure(14)
-# plt.plot(FuseT_1, label='First PCA Thorax component')
-# plt.plot(EstimSmoothT, label='Savgol filtered version')
-# plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-# plt.title('First abdomen PC, savgol filtered version and peaks')
-# plt.legend(loc='upper right')
+plt.figure(14)
+plt.plot(FuseT_1, label='First PCA Thorax component')
+plt.plot(EstimSmoothT, label='Savgol filtered version')
+plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+plt.title('First abdomen PC, savgol filtered version and peaks')
+plt.legend(loc='upper right')
 
 lowThreshold = min(lowThreshold_A, lowThreshold_T)  # the low threshold is computed as the minimum between the thoracic and the abdominal one
 
