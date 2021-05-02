@@ -1,10 +1,10 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-chunksize = 128  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+chunksize = 256  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 SgolayWindowPCA = 31
-skip_chunks_start = 2  # number of intial chunks to skip
-skip_chunks_end = 3  # number of final chunks to skip
+skip_chunks_start = 0  # number of intial chunks to skip
+skip_chunks_end = 0  # number of final chunks to skip
 
 import warnings
 
@@ -22,7 +22,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_G.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -267,42 +267,44 @@ for c in range(n_chunks):
         t1.loc[i + c * chunksize] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
         # Fare la stessa cosa per device 2
 
-    #  Fuori dall'iterazione DENTRO il chunk
+    #  FINE CALCOLO Chunk, ora lavoro sul chunk
     FuseT_1.extend(pca.fit_transform(t1.loc[c * chunksize:(c + 1) * chunksize]))  # PCA del c-esimo chunk
-    EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
-    # rilevazione picchi
-    diff_T = max(EstimSmoothT) - min(EstimSmoothT)
-    thr_T = diff_T * 5 / 100
-    Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
-    Index_T = Index_T[0]
-    fStimVec_T = []
-    for i in range(len(Index_T) - 1):
-        intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
-        fstim = 1 / intrapeak
-        fStimVec_T.append(fstim)
 
     plt.subplot(3, 1, 1)
     plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-    plt.plot(pezzo11)
-    plt.plot(pezzo12)
-    plt.plot(pezzo13)
-    plt.plot(pezzo14)
+    plt.plot(pezzo11, color='red')
+    plt.plot(pezzo12, color='green')
+    plt.plot(pezzo13, color='skyblue')
+    plt.plot(pezzo14, color='darkviolet')
 
     plt.subplot(3, 1, 2)
     plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
-    plt.plot(pezzo31)
-    plt.plot(pezzo32)
-    plt.plot(pezzo33)
-    plt.plot(pezzo34)
+    plt.plot(pezzo31, color='red')
+    plt.plot(pezzo32, color='green')
+    plt.plot(pezzo33, color='skyblue')
+    plt.plot(pezzo34, color='darkviolet')
 
     plt.subplot(3, 1, 3)
     # plt.title('Thoracic component (t1) w/o MA(97)')
     # plt.plot(t1)
-    # plt.title('First PCA Thorax component')
-    # plt.plot(FuseT_1)
-    plt.title('First PCA Thorax component (FILTERED, positive peaks highlighted)')
-    plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-    plt.plot(EstimSmoothT)
-    plt.pause(0.001)
+    plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting (AT THE END)')
+    plt.plot(FuseT_1, color='gold')
+    plt.pause(0.5)
 
+#  FINE ITERAZIONE
+
+#filtraggio segnale PCA (fatto alla fine perchè altrimenti genera brutti artifacts)
+EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
+# rilevazione picchi
+diff_T = max(EstimSmoothT) - min(EstimSmoothT)
+thr_T = diff_T * 5 / 100
+Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
+Index_T = Index_T[0]
+fStimVec_T = []
+for i in range(len(Index_T) - 1):
+    intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
+    fstim = 1 / intrapeak
+    fStimVec_T.append(fstim)
+plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+plt.plot(EstimSmoothT, color='red')
 plt.show()
