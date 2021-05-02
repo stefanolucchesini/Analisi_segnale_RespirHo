@@ -30,7 +30,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_G.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -133,6 +133,8 @@ fdev = (max(len(data_1['1']),len(data_2['1']),len(data_3['1'])))/300
 
 max_value=max_value-1
 # add an empty row when there is a "jump" in communication, when the nth value is not received
+data_1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1bef.csv', index = False, header=True)
+
 for i in range(max_value):
     for j in range(256):
         if data_1['nthvalue'][j + i * 256] != j:
@@ -142,6 +144,7 @@ for i in range(max_value):
             data_1 = data_1.reset_index(drop=True)
 
 data_1 = data_1.iloc[:max_value * 256]
+data_1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index = False, header=True)
 
 
 for i in range(max_value):

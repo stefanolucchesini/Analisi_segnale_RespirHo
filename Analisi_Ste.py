@@ -1,9 +1,10 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-chunksize = 250  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+chunksize = 128  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 SgolayWindowPCA = 31
-skip_chunks = 0  # number of intial chunks to skip
+skip_chunks_start = 2  # number of intial chunks to skip
+skip_chunks_end = 3  # number of final chunks to skip
 
 import warnings
 
@@ -21,7 +22,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_G.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -62,10 +63,8 @@ data['4'] = data['4'].str.replace(']', '')
 
 data_1 = data[data['DevID'].str.contains('01')]  # thoracic data
 data_1 = data_1.reset_index(drop=True)
-
 data_2 = data[data['DevID'].str.contains('02')]  # abdominal data
 data_2 = data_2.reset_index(drop=True)
-
 data_3 = data[data['DevID'].str.contains('03')]  # reference data
 data_3 = data_3.reset_index(drop=True)
 
@@ -101,7 +100,7 @@ data_2['4'] = data_2['4'].apply(int, base=16)
 data_3['4'] = data_3['4'].apply(int, base=16)
 
 max_value = max_value - 1
-
+data_1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1bef.csv', index = False, header=True)
 for i in range(max_value):
     for j in range(256):
         if data_1['nthvalue'][j + i * 256] != j:
@@ -111,6 +110,7 @@ for i in range(max_value):
             data_1 = data_1.reset_index(drop=True)
 
 data_1 = data_1.iloc[:max_value * 256]
+data_1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index = False, header=True)
 
 for i in range(max_value):
     for j in range(256):
@@ -121,7 +121,6 @@ for i in range(max_value):
 
 data_2 = data_2.iloc[:max_value * 256]
 
-print(data_3)
 for i in range(max_value):
     for j in range(256):
         if data_3['nthvalue'][j + i * 256] != j:
@@ -156,10 +155,13 @@ fdev = (max(len(data_1['1']), len(data_2['1']), len(data_3['1']))) / 300
 
 for c in range(n_chunks):
 
-    if skip_chunks:
-        skip_chunks -= 1
+    if skip_chunks_start:
+        skip_chunks_start -= 1
         continue
-
+    if n_chunks - c == skip_chunks_end:
+        skip_chunks_end -= 1
+        continue
+    print("Chunk number:", c)
     # THORAX DEVICE
     pezzo11 = data_1.loc[c * chunksize:(c + 1) * chunksize - 1, '1']
     pezzo11.interpolate(method='pchip', inplace=True)
