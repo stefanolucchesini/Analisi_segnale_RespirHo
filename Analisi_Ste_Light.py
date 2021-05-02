@@ -22,12 +22,11 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
-data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
-# select only the Rx line
-data = data.loc[data['TxRx'] == 'Rx']
-data = data.drop(['TxRx', 'None'], axis=1)
+data = pd.read_csv('test.txt', sep=",|:", header=None, engine='python')
+data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
+data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
+
 # traforming into string in order to remove [ and ] from the file\
 data['DevID'] = data['DevID'].astype(str)
 data['DevID'] = data['DevID'].str.replace('[', '')
@@ -68,9 +67,9 @@ data_2 = data_2.reset_index(drop=True)
 data_3 = data[data['DevID'].str.contains('03')]  # reference data
 data_3 = data_3.reset_index(drop=True)
 
-data_1 = data_1[data_1.columns[3:8]].copy()
-data_2 = data_2[data_2.columns[3:8]].copy()
-data_3 = data_3[data_3.columns[3:8]].copy()
+data_1 = data_1[data_1.columns[2:8]].copy()
+data_2 = data_2[data_2.columns[2:8]].copy()
+data_3 = data_3[data_3.columns[2:8]].copy()
 
 print("Numero di campioni acquisiti da unita' 1: ", len(data_1))
 print("Numero di campioni acquisiti da unita' 2: ", len(data_2))
@@ -100,37 +99,14 @@ data_1['4'] = data_1['4'].apply(int, base=16)
 data_2['4'] = data_2['4'].apply(int, base=16)
 data_3['4'] = data_3['4'].apply(int, base=16)
 
-#data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1bef.csv', index = False, header=True)
-for i in range(max_value):
-    for j in range(256):
-        if data_1['nthvalue'][j + i * 256] != j:
-            empty_row = pd.DataFrame([], index=[j + i * 256])  # creating the empty row
-            data_1 = pd.concat([data_1.loc[:j + i * 256 - 1], empty_row, data_1.loc[j + i * 256:]])
-            # print(i)
-            data_1 = data_1.reset_index(drop=True)
-
-data_1 = data_1.iloc[:max_value * 256]
-#data_1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index = False, header=True)
-
-data_2.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2bef.csv', index = False, header=True)
-for i in range(max_value):
-    for j in range(256):
-        if data_2['nthvalue'][j + i * 256] != j:
-            empty_row = pd.DataFrame([], index=[j + i * 256])  # creating the empty data
-            data_2 = pd.concat([data_2.loc[:j + i * 256 - 1], empty_row, data_2.loc[j + i * 256:]])
-            data_2 = data_2.reset_index(drop=True)
-
-data_2 = data_2.iloc[:max_value * 256]
-data_2.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index = False, header=True)
-
-for i in range(max_value):
-    for j in range(256):
-        if data_3['nthvalue'][j + i * 256] != j:
-            empty_row = pd.DataFrame([], index=[j + i * 256])  # creating the empty data
-            data_3 = pd.concat([data_3.loc[:j + i * 256 - 1], empty_row, data_3.loc[j + i * 256:]])
-            data_3 = data_3.reset_index(drop=True)
-
-data_3 = data_3.iloc[:max_value * 256]
+#Replace missing data with nan
+data_1.loc[data_1.C == 'FF', ['1', '2', '3', '4']] = np.nan
+data_2.loc[data_2.C == 'FF', ['1', '2', '3', '4']] = np.nan
+data_3.loc[data_3.C == 'FF', ['1', '2', '3', '4']] = np.nan
+data_1.drop(columns='C', inplace=True)
+data_2.drop(columns='C', inplace=True)
+data_3.drop(columns='C', inplace=True)
+#data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index = False, header=True)
 
 list1 = [len(data_1), len(data_2), len(data_3)]
 min_samples = min(list1)  # shortest number of samples
