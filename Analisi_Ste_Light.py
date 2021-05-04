@@ -25,7 +25,7 @@ plt.rcParams.update({'figure.max_open_warning': 0})
 data = pd.read_csv('test.txt', sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
-data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
+#data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
 
 # traforming into string in order to remove [ and ] from the file\
 data['DevID'] = data['DevID'].astype(str)
