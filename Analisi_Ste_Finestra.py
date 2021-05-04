@@ -1,7 +1,7 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-window_size = 128  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+window_size = 10  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 SgolayWindowPCA = 31
 skip_chunks_start = 0  # number of intial chunks to skip
 skip_chunks_end = 0  # number of final chunks to skip
@@ -111,6 +111,7 @@ Ref_pose_quat = Quaternion()
 FuseT_1 = []
 
 index = 0  # global index for total data
+count = 0
 index_1, index_2, index_3 = 0, 0, 0  # indexes for devices
 
 length = len(data)
@@ -142,7 +143,24 @@ while index < length:
         quatsconv(3, index_3)  # device 3 conversion
         index_3 += 1
 
-    # Creazione dataframe del torace (2)
+    if index_3 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+        pezzo31 = data3.loc[index_3 - window_size:index_3, '1']
+        pezzo31.interpolate(method='pchip', inplace=True)
+        pezzo31.fillna(method='bfill', inplace=True)
+
+        pezzo32 = data3.loc[index_3 - window_size:index_3, '2']
+        pezzo32.interpolate(method='pchip', inplace=True)
+        pezzo32.fillna(method='bfill', inplace=True)
+
+        pezzo33 = data3.loc[index_3 - window_size:index_3, '3']
+        pezzo33.interpolate(method='pchip', inplace=True)
+        pezzo33.fillna(method='bfill', inplace=True)
+
+        pezzo34 = data3.loc[index_3 - window_size:index_3, '4']
+        pezzo34.interpolate(method='pchip', inplace=True)
+        pezzo34.fillna(method='bfill', inplace=True)
+
+    # Creazione dataframe dell'addome (2)
     check = data.iloc[index].str.contains('2')
     if check['DevID'] == True:  # se device id è 2
         # mette il dato nel dataframe del terzo device
@@ -152,6 +170,22 @@ while index < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_2)  # device 1 conversion
         index_2 += 1
+    if index_2 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+        pezzo21 = data2.loc[index_2 - window_size:index_2, '1']
+        pezzo21.interpolate(method='pchip', inplace=True)
+        pezzo21.fillna(method='bfill', inplace=True)
+
+        pezzo22 = data2.loc[index_2 - window_size:index_2, '2']
+        pezzo22.interpolate(method='pchip', inplace=True)
+        pezzo22.fillna(method='bfill', inplace=True)
+
+        pezzo23 = data2.loc[index_2 - window_size:index_2, '3']
+        pezzo23.interpolate(method='pchip', inplace=True)
+        pezzo23.fillna(method='bfill', inplace=True)
+
+        pezzo24 = data2.loc[index_2 - window_size:index_2, '4']
+        pezzo24.interpolate(method='pchip', inplace=True)
+        pezzo24.fillna(method='bfill', inplace=True)
 
     # Creazione dataframe del torace (1)
     check = data.iloc[index].str.contains('01')
@@ -163,26 +197,49 @@ while index < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_1)  # device 1 conversion
         index_1 += 1
-
-    if index > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
-        pezzo11 = data1.loc[index - window_size:index, '1']
+    if index_1 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+        pezzo11 = data1.loc[index_1 - window_size:index_1, '1']
         pezzo11.interpolate(method='pchip', inplace=True)
         pezzo11.fillna(method='bfill', inplace=True)
 
-        pezzo12 = data1.loc[index - window_size:index, '2']
+        pezzo12 = data1.loc[index_1 - window_size:index_1, '2']
         pezzo12.interpolate(method='pchip', inplace=True)
         pezzo12.fillna(method='bfill', inplace=True)
 
-        pezzo13 = data1.loc[index - window_size:index, '3']
+        pezzo13 = data1.loc[index_1 - window_size:index_1, '3']
         pezzo13.interpolate(method='pchip', inplace=True)
         pezzo13.fillna(method='bfill', inplace=True)
 
-        pezzo14 = data1.loc[index - window_size:index, '4']
+        pezzo14 = data1.loc[index_1 - window_size:index_1, '4']
         pezzo14.interpolate(method='pchip', inplace=True)
         pezzo14.fillna(method='bfill', inplace=True)
 
-    index += 1
 
-data1.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index = False, header=True)
-data2.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index = False, header=True)
-data3.to_csv (r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index = False, header=True)
+    if count >= window_size and index_1 > window_size and index_2 > window_size and index_3 > window_size:
+        count = 0
+        plt.subplot(3, 1, 1)
+        plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
+        plt.plot(pezzo11, color='red')
+        plt.plot(pezzo12, color='green')
+        plt.plot(pezzo13, color='skyblue')
+        plt.plot(pezzo14, color='darkviolet')
+        plt.subplot(3, 1, 2)
+        plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
+        plt.plot(pezzo21, color='red')
+        plt.plot(pezzo22, color='green')
+        plt.plot(pezzo23, color='skyblue')
+        plt.plot(pezzo24, color='darkviolet')
+        plt.subplot(3, 1, 3)
+        plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
+        plt.plot(pezzo31, color='red')
+        plt.plot(pezzo32, color='green')
+        plt.plot(pezzo33, color='skyblue')
+        plt.plot(pezzo34, color='darkviolet')
+        plt.pause(0.001)
+
+    index += 1  # global
+    count += 1
+plt.show()
+# data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
+# data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
+# data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
