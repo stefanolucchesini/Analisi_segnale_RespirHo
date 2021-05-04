@@ -3,11 +3,8 @@ globals().clear()
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
 window_size = 10  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 SgolayWindowPCA = 31
-skip_chunks_start = 0  # number of intial chunks to skip
-skip_chunks_end = 0  # number of final chunks to skip
 
 import warnings
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 import math
@@ -120,21 +117,21 @@ print("Il dataset ha", length, "campioni")
 #  PARTE ITERATIVA DEL CODICE
 
 while index < length:
-    print("INDEX:", index)
+    print("INDEX3:", index_3)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index] = data.iloc[index].astype(str)
     data.iloc[index] = data.iloc[index].str.replace('[', '')
     data.iloc[index] = data.iloc[index].str.replace(']', '')
     data.iloc[index, 1:8] = data.iloc[index, 1:8].apply(int, base=16)  # convert to base 10 everything but DevID
-    # Mette NAN ai quaternioni se il pacchetto è invalido
 
+    # Mette NAN ai quaternioni se il pacchetto è invalido
     if data.iloc[index, 2] == 255:  # 2 è la colonna B
         data.iloc[index, 4:8] = np.nan
         # print("Il nan è a", index)
 
     # Creazione dataframe del Reference (3)
     check = data.iloc[index].str.contains('03')
-    if check['DevID'] == True:  # se device id è 3
+    if check['DevID']:  # se device id è 3
         # mette il dato nel dataframe del terzo device
         data3 = data3.append(data.iloc[index])
         data3 = data3.reset_index(drop=True)
@@ -143,26 +140,20 @@ while index < length:
         quatsconv(3, index_3)  # device 3 conversion
         index_3 += 1
 
-    if index_3 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
-        pezzo31 = data3.loc[index_3 - window_size:index_3, '1']
-        pezzo31.interpolate(method='pchip', inplace=True)
-        pezzo31.fillna(method='bfill', inplace=True)
-
-        pezzo32 = data3.loc[index_3 - window_size:index_3, '2']
-        pezzo32.interpolate(method='pchip', inplace=True)
-        pezzo32.fillna(method='bfill', inplace=True)
-
-        pezzo33 = data3.loc[index_3 - window_size:index_3, '3']
-        pezzo33.interpolate(method='pchip', inplace=True)
-        pezzo33.fillna(method='bfill', inplace=True)
-
-        pezzo34 = data3.loc[index_3 - window_size:index_3, '4']
-        pezzo34.interpolate(method='pchip', inplace=True)
-        pezzo34.fillna(method='bfill', inplace=True)
+    if index_3 >= window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+        data3['1'].interpolate(method='pchip', inplace=True)
+        data3['1'].fillna(method='bfill', inplace=True)
+        data3['2'].interpolate(method='pchip', inplace=True)
+        data3['2'].fillna(method='bfill', inplace=True)
+        data3['3'].interpolate(method='pchip', inplace=True)
+        data3['3'].fillna(method='bfill', inplace=True)
+        data3['4'].interpolate(method='pchip', inplace=True)
+        data3['4'].fillna(method='bfill', inplace=True)
+        print(data3)
 
     # Creazione dataframe dell'addome (2)
     check = data.iloc[index].str.contains('2')
-    if check['DevID'] == True:  # se device id è 2
+    if check['DevID']:  # se device id è 2
         # mette il dato nel dataframe del terzo device
         data2 = data2.append(data.iloc[index])
         data2 = data2.reset_index(drop=True)
@@ -170,7 +161,7 @@ while index < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_2)  # device 1 conversion
         index_2 += 1
-    if index_2 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+    if index_2 >= window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
         pezzo21 = data2.loc[index_2 - window_size:index_2, '1']
         pezzo21.interpolate(method='pchip', inplace=True)
         pezzo21.fillna(method='bfill', inplace=True)
@@ -189,7 +180,7 @@ while index < length:
 
     # Creazione dataframe del torace (1)
     check = data.iloc[index].str.contains('01')
-    if check['DevID'] == True:  # se device id è 1
+    if check['DevID']:  # se device id è 1
         # mette il dato nel dataframe del terzo device
         data1 = data1.append(data.iloc[index])
         data1 = data1.reset_index(drop=True)
@@ -197,7 +188,7 @@ while index < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_1)  # device 1 conversion
         index_1 += 1
-    if index_1 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
+    if index_1 >= window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
         pezzo11 = data1.loc[index_1 - window_size:index_1, '1']
         pezzo11.interpolate(method='pchip', inplace=True)
         pezzo11.fillna(method='bfill', inplace=True)
@@ -231,15 +222,15 @@ while index < length:
         plt.plot(pezzo24, color='darkviolet')
         plt.subplot(3, 1, 3)
         plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
-        plt.plot(pezzo31, color='red')
-        plt.plot(pezzo32, color='green')
-        plt.plot(pezzo33, color='skyblue')
-        plt.plot(pezzo34, color='darkviolet')
-        plt.pause(0.001)
+        plt.plot(data3['1'], color='red')
+        plt.plot(data3['2'], color='green')
+        plt.plot(data3['3'], color='skyblue')
+        plt.plot(data3['4'], color='darkviolet')
+        plt.pause(0.01)
 
     index += 1  # global
     count += 1
 plt.show()
-# data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
-# data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
-# data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
+#data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
+#data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
+#data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
