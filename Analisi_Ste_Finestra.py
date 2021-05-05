@@ -1,7 +1,7 @@
 globals().clear()
 
 digit2voltage = 9 / 640  # value used to convert sample value to voltage
-window_size = 10  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
+window_size = 97  # number of samples taken for computing a chunk of data (600 = 1 minute of acquisition)
 SgolayWindowPCA = 31
 skip_chunks_start = 0  # number of intial chunks to skip
 skip_chunks_end = 0  # number of final chunks to skip
@@ -112,7 +112,7 @@ FuseT_1 = []
 
 index_data = 0  # global index for total data
 count = 0
-index_1, index_2, index_3 = 0, 0, 0  # indexes for devices
+index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_window = 0 # index for computing things in window
 length = len(data)
 print("Il dataset ha", length, "campioni")
@@ -142,8 +142,8 @@ while index_data < length:
         ref = ref.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
         ref = ref.astype(float)
         # conversion of quaternions in range [-1:1]
-        quatsconv(3, index_3)  # device 3 conversion
-        index_3 += 1
+        quatsconv(3, index_ref)  # device 3 conversion
+        index_ref += 1
 
     # Creazione dataframe dell'addome (2)
     check = data.iloc[index_data].str.contains('2')
@@ -154,8 +154,8 @@ while index_data < length:
         abd = abd.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
         abd = abd.astype(float)
         # conversion of quaternions in range [-1:1]
-        quatsconv(2, index_2)  # device 1 conversion
-        index_2 += 1
+        quatsconv(2, index_abd)  # device 1 conversion
+        index_abd += 1
 
     # Creazione dataframe del torace (1)
     check = data.iloc[index_data].str.contains('01')
@@ -166,10 +166,10 @@ while index_data < length:
         tor = tor.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
         tor = tor.astype(float)
         # conversion of quaternions in range [-1:1]
-        quatsconv(1, index_1)  # device 1 conversion
-        index_1 += 1
+        quatsconv(1, index_tor)  # device 1 conversion
+        index_tor += 1
 
-    if index_1 > window_size and index_2 > window_size and index_3 > window_size:
+    if index_tor >= window_size and index_abd > window_size and index_ref > window_size:
 
         # inizia a lavorare sui dati quando la prima finestra è piena
         #INTERPOLATE NON VA...fa divergere tutto
@@ -177,13 +177,13 @@ while index_data < length:
         #abd.interpolate(method='pchip', inplace=True)
         #ref.interpolate(method='pchip', inplace=True)
         #tor = tor.loc[1:]
-        tor.fillna(method='bfill', inplace=True)
+        tor.iloc[index_tor - window_size:index_tor].fillna(method='bfill', inplace=True)
         #tor = tor.reset_index(drop=True)
         #abd = abd.loc[1:]
-        abd.fillna(method='bfill', inplace=True)
+        abd.iloc[index_abd - window_size:index_abd].fillna(method='bfill', inplace=True)
         #abd = abd.reset_index(drop=True)
         #ref = ref.loc[1:]
-        ref.fillna(method='bfill', inplace=True)
+        ref.iloc[index_ref - window_size:index_ref].fillna(method='bfill', inplace=True)
         #ref = ref.reset_index(drop=True)
 
         index_window += 1
