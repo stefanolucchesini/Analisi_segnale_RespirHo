@@ -22,7 +22,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('test.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('test1.txt', sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
 
@@ -113,7 +113,7 @@ FuseT_1 = []
 index_data = 0  # global index for total data
 count = 0
 index_1, index_2, index_3 = 0, 0, 0  # indexes for devices
-
+index_window = 0 # index for computing things in window
 length = len(data)
 print("Il dataset ha", length, "campioni")
 
@@ -143,22 +143,7 @@ while index_data < length:
         quatsconv(3, index_3)  # device 3 conversion
         index_3 += 1
 
-    if index_3 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
-        pezzo31 = data3.loc[index_3 - window_size:index_3, '1']
-        pezzo31.interpolate(method='pchip', inplace=True)
-        pezzo31.fillna(method='bfill', inplace=True)
 
-        pezzo32 = data3.loc[index_3 - window_size:index_3, '2']
-        pezzo32.interpolate(method='pchip', inplace=True)
-        pezzo32.fillna(method='bfill', inplace=True)
-
-        pezzo33 = data3.loc[index_3 - window_size:index_3, '3']
-        pezzo33.interpolate(method='pchip', inplace=True)
-        pezzo33.fillna(method='bfill', inplace=True)
-
-        pezzo34 = data3.loc[index_3 - window_size:index_3, '4']
-        pezzo34.interpolate(method='pchip', inplace=True)
-        pezzo34.fillna(method='bfill', inplace=True)
 
     # Creazione dataframe dell'addome (2)
     check = data.iloc[index_data].str.contains('2')
@@ -170,22 +155,6 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_2)  # device 1 conversion
         index_2 += 1
-    if index_2 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
-        pezzo21 = data2.loc[index_2 - window_size:index_2, '1']
-        pezzo21.interpolate(method='pchip', inplace=True)
-        pezzo21.fillna(method='bfill', inplace=True)
-
-        pezzo22 = data2.loc[index_2 - window_size:index_2, '2']
-        pezzo22.interpolate(method='pchip', inplace=True)
-        pezzo22.fillna(method='bfill', inplace=True)
-
-        pezzo23 = data2.loc[index_2 - window_size:index_2, '3']
-        pezzo23.interpolate(method='pchip', inplace=True)
-        pezzo23.fillna(method='bfill', inplace=True)
-
-        pezzo24 = data2.loc[index_2 - window_size:index_2, '4']
-        pezzo24.interpolate(method='pchip', inplace=True)
-        pezzo24.fillna(method='bfill', inplace=True)
 
     # Creazione dataframe del torace (1)
     check = data.iloc[index_data].str.contains('01')
@@ -197,51 +166,102 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_1)  # device 1 conversion
         index_1 += 1
-    if index_1 > window_size:  # inizia a lavorare sui dati quando la prima finestra è piena
-        pezzo11 = data1.loc[index_1 - window_size:index_1, '1']
-        pezzo11.interpolate(method='pchip', inplace=True)
-        pezzo11.fillna(method='bfill', inplace=True)
 
-        pezzo12 = data1.loc[index_1 - window_size:index_1, '2']
-        pezzo12.interpolate(method='pchip', inplace=True)
-        pezzo12.fillna(method='bfill', inplace=True)
+    if index_1 > window_size and index_2 > window_size and index_3 > window_size:
 
-        pezzo13 = data1.loc[index_1 - window_size:index_1, '3']
-        pezzo13.interpolate(method='pchip', inplace=True)
-        pezzo13.fillna(method='bfill', inplace=True)
+        # inizia a lavorare sui dati quando la prima finestra è piena
+        #REFERENCE
+        #data3['1'] = data3['1'].interpolate(method='pchip')  rischio divergenza se mancano tanti dati!!
+        data3['1'] = data3['1'].fillna(method='bfill')
+        #data3['2'] = data3['2'].interpolate(method='pchip')
+        data3['2'] = data3['2'].fillna(method='bfill')
+        #data3['3'] = data3['3'].interpolate(method='pchip')
+        data3['3'] = data3['3'].fillna(method='bfill')
+        #data3['4'] = data3['4'].interpolate(method='pchip')
+        data3['4'] = data3['4'].fillna(method='bfill')
+        #ABDOMEN
+        #data2['1'] = data2['1'].interpolate(method='pchip')
+        data2['1'] = data2['1'].fillna(method='bfill')
+        #data2['2'] = data2['2'].interpolate(method='pchip')
+        data2['2'] = data2['2'].fillna(method='bfill')
+        #data2['3'] = data2['3'].interpolate(method='pchip')
+        data2['3'] = data2['3'].fillna(method='bfill')
+        #data2['4'] = data2['4'].interpolate(method='pchip')
+        data2['4'] = data2['4'].fillna(method='bfill')
+        #THORAX
+        #data1['1'] = data1['1'].interpolate(method='pchip')
+        data1['1'] = data1['1'].fillna(method='bfill')
+        #data1['2'] = data1['2'].interpolate(method='pchip')
+        data1['2'] = data1['2'].fillna(method='bfill')
+        #data1['3'] = data1['3'].interpolate(method='pchip')
+        data1['3'] = data1['3'].fillna(method='bfill')
+        #data1['4'] = data1['4'].interpolate(method='pchip')
+        data1['4'] = data1['4'].fillna(method='bfill')
 
-        pezzo14 = data1.loc[index_1 - window_size:index_1, '4']
-        pezzo14.interpolate(method='pchip', inplace=True)
-        pezzo14.fillna(method='bfill', inplace=True)
+        index_window += 1
 
-    if count >= window_size and index_1 > window_size and index_2 > window_size and index_3 > window_size:
-        count = 0
-        plt.subplot(3, 1, 1)
-        plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-        plt.ylim([-1, 1])
-        plt.plot(pezzo11, color='red')
-        plt.plot(pezzo12, color='green')
-        plt.plot(pezzo13, color='skyblue')
-        plt.plot(pezzo14, color='darkviolet')
-        plt.subplot(3, 1, 2)
-        plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
-        plt.ylim([-1, 1])
-        plt.plot(pezzo21, color='red')
-        plt.plot(pezzo22, color='green')
-        plt.plot(pezzo23, color='skyblue')
-        plt.plot(pezzo24, color='darkviolet')
-        plt.subplot(3, 1, 3)
-        plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
-        plt.ylim([-1, 1])
-        plt.plot(pezzo31, color='red')
-        plt.plot(pezzo32, color='green')
-        plt.plot(pezzo33, color='skyblue')
-        plt.plot(pezzo34, color='darkviolet')
-        plt.pause(0.001)
+
 
     index_data += 1  # global
     count += 1
+    if count > 100:
+        count = 0
+        plt.clf()
+        plt.subplot(3, 1, 1)
+        plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
+        plt.ylim([-1, 1])
+        plt.plot(data1['1'], color='red')
+        plt.plot(data1['2'], color='green')
+        plt.plot(data1['3'], color='skyblue')
+        plt.plot(data1['4'], color='darkviolet')
+
+        plt.subplot(3, 1, 2)
+        plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
+        plt.ylim([-1, 1])
+        plt.plot(data2['1'], color='red')
+        plt.plot(data2['2'], color='green')
+        plt.plot(data2['3'], color='skyblue')
+        plt.plot(data2['4'], color='darkviolet')
+        plt.draw()
+
+        plt.subplot(3, 1, 3)
+        plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
+        plt.ylim([-1, 1])
+        plt.plot(data3['1'], color='red')
+        plt.plot(data3['2'], color='green')
+        plt.plot(data3['3'], color='skyblue')
+        plt.plot(data3['4'], color='darkviolet')
+        plt.pause(0.01)
+
+
+#plot eventually remaining data
+plt.clf()
+plt.subplot(3, 1, 1)
+plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
+plt.ylim([-1, 1])
+plt.plot(data1['1'], color='red')
+plt.plot(data1['2'], color='green')
+plt.plot(data1['3'], color='skyblue')
+plt.plot(data1['4'], color='darkviolet')
+
+plt.subplot(3, 1, 2)
+plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
+plt.ylim([-1, 1])
+plt.plot(data2['1'], color='red')
+plt.plot(data2['2'], color='green')
+plt.plot(data2['3'], color='skyblue')
+plt.plot(data2['4'], color='darkviolet')
+plt.draw()
+
+plt.subplot(3, 1, 3)
+plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
+plt.ylim([-1, 1])
+plt.plot(data3['1'], color='red')
+plt.plot(data3['2'], color='green')
+plt.plot(data3['3'], color='skyblue')
+plt.plot(data3['4'], color='darkviolet')
 plt.show()
-# data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
-# data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
-# data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
+
+data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
+data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
+data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
