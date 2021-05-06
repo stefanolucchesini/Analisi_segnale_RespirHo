@@ -113,7 +113,6 @@ FuseT_1 = []
 index_data = 0  # global index for total data
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
-index_window = 0 # index for computing things in window
 length = len(data)
 print("Il dataset ha", length, "campioni")
 
@@ -177,7 +176,6 @@ while index_data < length:
         #ref.interpolate(method='pchip', inplace=True)
         #tor = tor.loc[1:]
         tor.iloc[index_tor - window_size:index_tor] = tor.iloc[index_tor - window_size:index_tor].fillna(method='bfill')
-        print("tor after", tor)
         #tor = tor.reset_index(drop=True)
         #abd = abd.loc[1:]
         abd.iloc[index_abd - window_size:index_abd] = abd.iloc[index_abd - window_size:index_abd].fillna(method='bfill')
@@ -185,18 +183,28 @@ while index_data < length:
         #ref = ref.loc[1:]
         ref.iloc[index_ref - window_size:index_ref] = ref.iloc[index_ref - window_size:index_ref].fillna(method='bfill')
         #ref = ref.reset_index(drop=True)
-
-        tor_pose_w = [statistics.mean(tor.iloc[index_tor - window_size:index_tor, 1]),
+        print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
+        tor_pose_w = [statistics.mean(tor.iloc[index_tor - window_size:index_tor, 1]),  #mean of thorax quat in window
                       statistics.mean(tor.iloc[index_tor - window_size:index_tor, 2]),
                       statistics.mean(tor.iloc[index_tor - window_size:index_tor, 3]),
                       statistics.mean(tor.iloc[index_tor - window_size:index_tor, 4])]
-        print("mean",tor_pose_w)
+        abd_pose_w = [statistics.mean(abd.iloc[index_abd - window_size:index_abd, 1]),
+                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 2]),
+                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 3]),
+                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 4])]
+        ref_pose_w = [statistics.mean(ref.iloc[index_ref - window_size:index_ref, 1]),
+                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 2]),
+                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 3]),
+                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 4])]
+        Tor_pose = []
+        while len(Tor_pose) < len(tor):
+            Tor_pose.append(tor_pose_w)
+        tor_array = tor.rename_axis().values
 
-        index_window += 1
 
     index_data += 1  # global
     count += 1
-    if count > 100:
+    if count > window_size:
         count = 0
         plt.subplot(3, 1, 1)
         plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
