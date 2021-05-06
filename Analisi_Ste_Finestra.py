@@ -168,23 +168,29 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_tor)  # device 1 conversion
         index_tor += 1
-
-    if index_tor >= window_size and index_abd > window_size and index_ref > window_size:
-
+    print("tor before",tor)
+    if index_tor >= window_size and index_abd >= window_size and index_ref >= window_size:
         # inizia a lavorare sui dati quando la prima finestra è piena
         #INTERPOLATE NON VA...fa divergere tutto
         #tor.interpolate(method='pchip', inplace=True)
         #abd.interpolate(method='pchip', inplace=True)
         #ref.interpolate(method='pchip', inplace=True)
         #tor = tor.loc[1:]
-        tor.iloc[index_tor - window_size:index_tor].fillna(method='bfill', inplace=True)
+        tor.iloc[index_tor - window_size:index_tor] = tor.iloc[index_tor - window_size:index_tor].fillna(method='bfill')
+        print("tor after", tor)
         #tor = tor.reset_index(drop=True)
         #abd = abd.loc[1:]
-        abd.iloc[index_abd - window_size:index_abd].fillna(method='bfill', inplace=True)
+        abd.iloc[index_abd - window_size:index_abd] = abd.iloc[index_abd - window_size:index_abd].fillna(method='bfill')
         #abd = abd.reset_index(drop=True)
         #ref = ref.loc[1:]
-        ref.iloc[index_ref - window_size:index_ref].fillna(method='bfill', inplace=True)
+        ref.iloc[index_ref - window_size:index_ref] = ref.iloc[index_ref - window_size:index_ref].fillna(method='bfill')
         #ref = ref.reset_index(drop=True)
+
+        tor_pose_w = [statistics.mean(tor.iloc[index_tor - window_size:index_tor, 1]),
+                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 2]),
+                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 3]),
+                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 4])]
+        print("mean",tor_pose_w)
 
         index_window += 1
 
