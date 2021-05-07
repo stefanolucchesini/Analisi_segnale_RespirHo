@@ -102,19 +102,22 @@ abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 
 pca = PCA(n_components=1)
-t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
 tor_quat = Quaternion()
 Tor_pose_quat = Quaternion()
+tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
 
 ref_quat = Quaternion()
 Ref_pose_quat = Quaternion()
+ref_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
+
 FuseT_1 = []
+Tor_pose, Ref_pose = [], []
 
 index_data = 0  # global index for total data
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
+index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
 index_window = 0  # for computing things inside the window
-i = 0  # used to increment index_window every 3 index_data
 flag = 0 #used for plotting after first window is available
 length = len(data)
 print("Il dataset ha", length, "campioni")
@@ -134,7 +137,7 @@ while index_data < length:
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
         data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria
-        # print("Il nan è a", index)
+        print("Il nan è a", index_data)
 
     # Creazione dataframe del Reference (3)
     check = data.iloc[index_data].str.contains('03')
@@ -173,11 +176,13 @@ while index_data < length:
         index_tor += 1
 
     # INSIDE THE WINDOW
-    if index_tor >= window_size and index_abd >= window_size and index_ref >= window_size:
+    if index_tor + index_abd + index_ref >= 3*window_size+3:
         print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
-        if i >= 3:
-            i = 0
+        if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
             flag += 1 #time to plot
+            index_tor_old = index_tor
+            index_ref_old = index_ref
+            index_abd_old = index_abd
             # inizia a lavorare sui dati quando la prima finestra è piena
             # INTERPOLATE NON VA...fa divergere tutto
             # tor.interpolate(method='pchip', inplace=True)
@@ -186,21 +191,22 @@ while index_data < length:
             # tor = tor.loc[1:]
             tor.iloc[index_window:index_window + window_size] = tor.iloc[
                                                                 index_window:index_window + window_size].fillna(
-                method='bfill')
+                method='ffill').fillna(method='bfill')
             # tor = tor.reset_index(drop=True)
             # abd = abd.loc[1:]
             abd.iloc[index_window:index_window + window_size] = abd.iloc[
                                                                 index_window:index_window + window_size].fillna(
-                method='bfill')
+                method='ffill').fillna(method='bfill')
             # abd = abd.reset_index(drop=True)
             # ref = ref.loc[1:]
             ref.iloc[index_window:index_window + window_size] = ref.iloc[
                                                                index_window:index_window + window_size].fillna(
-                method='bfill')
+                method='ffill').fillna(method='bfill')
             # ref = ref.reset_index(drop=True)
-            print("index_window:", index_window)
+            print("index_window+window_size:", index_window+window_size)
+            print("ref just after interpol\n", ref.head(index_window+window_size))
+            # mean of thorax quat in window
             tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
-                          # mean of thorax quat in window
                           statistics.mean(tor.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(tor.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(tor.iloc[index_window:index_window + window_size, 4])]
@@ -212,39 +218,77 @@ while index_data < length:
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-            Tor_pose = []
             while len(Tor_pose) < len(tor):
                 Tor_pose.append(tor_pose_w)
-            tor_array = tor.rename_axis().values
+                Ref_pose.append(ref_pose_w)
+            tor_array = tor.iloc[:index_window + window_size, 1:5].rename_axis().values  #takes the 4 quaternions, excludes battery voltage
+            ref_array = ref.iloc[:index_window + window_size, 1:5].rename_axis().values
+            print("ref", ref.head(index_window+window_size))
+
+            print("len tor", len(tor))
+            print("len tor array", len(tor_array))
+            Tor_Ok_array = tor_pose.rename_axis().values
+            Ref_Ok_array = ref_pose.rename_axis().values
+            t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
+
+            for i in range(index_window, index_window+window_size): #campione per campione DENTRO finestra
+                # THORAX QUATERNION COMPUTATION
+                tor_quat = Quaternion(tor_array[i])
+                Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion conjugate
+                tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
+                tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
+                # REFERENCE QUATERNION COMPUTATION
+                ref_quat = Quaternion(ref_array[i])
+                Ref_pose_quat = Quaternion(Ref_pose[i])  # quaternion conjugate
+                ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+                ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
+
+                #THORAX COMPONENT
+                Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
+                Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
+                t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+
+            interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size, min_periods=49, center=True).mean()
+            t1 = t1 - interp_T
+            FuseT_1 = pca.fit_transform(t1)  # PCA thorax
+
+
             index_window += 1
 
     index_data += 1  # global
-    i += 1
     if flag >= 50:
         flag = 0
         plt.clf()
-        plt.subplot(3, 1, 1)
+        plt.subplot(4, 1, 1)
         plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
         plt.plot(tor[['1', '2', '3', '4']])
-        plt.subplot(3, 1, 2)
+        plt.subplot(4, 1, 2)
         plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
         plt.plot(abd[['1', '2', '3', '4']])
-        plt.subplot(3, 1, 3)
+        plt.subplot(4, 1, 3)
         plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
         plt.plot(ref[['1', '2', '3', '4']])
+        plt.subplot(4, 1, 4)
+        plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting (AT THE END)')
+        plt.plot(FuseT_1, color='gold')
+
         plt.pause(0.01)
 
 # plot eventually remaining data
 plt.clf()
-plt.subplot(3, 1, 1)
+plt.subplot(4, 1, 1)
 plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
 plt.plot(tor[['1', '2', '3', '4']])
-plt.subplot(3, 1, 2)
+plt.subplot(4, 1, 2)
 plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
 plt.plot(abd[['1', '2', '3', '4']])
-plt.subplot(3, 1, 3)
+plt.subplot(4, 1, 3)
 plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
 plt.plot(ref[['1', '2', '3', '4']])
+plt.subplot(4, 1, 4)
+plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting (AT THE END)')
+plt.plot(FuseT_1, color='gold')
 
 plt.show()
 
