@@ -113,6 +113,9 @@ FuseT_1 = []
 index_data = 0  # global index for total data
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
+index_window = 0  # for computing things inside the window
+i = 0  # used to increment index_window every 3 index_data
+flag = 0 #used for plotting after first window is available
 length = len(data)
 print("Il dataset ha", length, "campioni")
 
@@ -124,12 +127,13 @@ while index_data < length:
     data.iloc[index_data] = data.iloc[index_data].astype(str)
     data.iloc[index_data] = data.iloc[index_data].str.replace('[', '')
     data.iloc[index_data] = data.iloc[index_data].str.replace(']', '')
-    data.iloc[index_data, 1:8] = data.iloc[index_data, 1:8].apply(int, base=16)  # convert to base 10 everything but DevID
+    data.iloc[index_data, 1:8] = data.iloc[index_data, 1:8].apply(int,
+                                                                  base=16)  # convert to base 10 everything but DevID
 
     # Mette NAN ai quaternioni se il pacchetto è invalido
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
-        data.iloc[index_data, 1] = np.nan #mette nan anche al valore della batteria
+        data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria
         # print("Il nan è a", index)
 
     # Creazione dataframe del Reference (3)
@@ -167,45 +171,58 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_tor)  # device 1 conversion
         index_tor += 1
-    print("tor before",tor)
-    if index_tor >= window_size and index_abd >= window_size and index_ref >= window_size:
-        # inizia a lavorare sui dati quando la prima finestra è piena
-        #INTERPOLATE NON VA...fa divergere tutto
-        #tor.interpolate(method='pchip', inplace=True)
-        #abd.interpolate(method='pchip', inplace=True)
-        #ref.interpolate(method='pchip', inplace=True)
-        #tor = tor.loc[1:]
-        tor.iloc[index_tor - window_size:index_tor] = tor.iloc[index_tor - window_size:index_tor].fillna(method='bfill')
-        #tor = tor.reset_index(drop=True)
-        #abd = abd.loc[1:]
-        abd.iloc[index_abd - window_size:index_abd] = abd.iloc[index_abd - window_size:index_abd].fillna(method='bfill')
-        #abd = abd.reset_index(drop=True)
-        #ref = ref.loc[1:]
-        ref.iloc[index_ref - window_size:index_ref] = ref.iloc[index_ref - window_size:index_ref].fillna(method='bfill')
-        #ref = ref.reset_index(drop=True)
-        print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
-        tor_pose_w = [statistics.mean(tor.iloc[index_tor - window_size:index_tor, 1]),  #mean of thorax quat in window
-                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 2]),
-                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 3]),
-                      statistics.mean(tor.iloc[index_tor - window_size:index_tor, 4])]
-        abd_pose_w = [statistics.mean(abd.iloc[index_abd - window_size:index_abd, 1]),
-                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 2]),
-                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 3]),
-                      statistics.mean(abd.iloc[index_abd - window_size:index_abd, 4])]
-        ref_pose_w = [statistics.mean(ref.iloc[index_ref - window_size:index_ref, 1]),
-                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 2]),
-                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 3]),
-                      statistics.mean(ref.iloc[index_ref - window_size:index_ref, 4])]
-        Tor_pose = []
-        while len(Tor_pose) < len(tor):
-            Tor_pose.append(tor_pose_w)
-        tor_array = tor.rename_axis().values
 
+    # INSIDE THE WINDOW
+    if index_tor >= window_size and index_abd >= window_size and index_ref >= window_size:
+        print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
+        if i >= 3:
+            i = 0
+            flag += 1 #time to plot
+            # inizia a lavorare sui dati quando la prima finestra è piena
+            # INTERPOLATE NON VA...fa divergere tutto
+            # tor.interpolate(method='pchip', inplace=True)
+            # abd.interpolate(method='pchip', inplace=True)
+            # ref.interpolate(method='pchip', inplace=True)
+            # tor = tor.loc[1:]
+            tor.iloc[index_window:index_window + window_size] = tor.iloc[
+                                                                index_window:index_window + window_size].fillna(
+                method='bfill')
+            # tor = tor.reset_index(drop=True)
+            # abd = abd.loc[1:]
+            abd.iloc[index_window:index_window + window_size] = abd.iloc[
+                                                                index_window:index_window + window_size].fillna(
+                method='bfill')
+            # abd = abd.reset_index(drop=True)
+            # ref = ref.loc[1:]
+            ref.iloc[index_window:index_window + window_size] = ref.iloc[
+                                                               index_window:index_window + window_size].fillna(
+                method='bfill')
+            # ref = ref.reset_index(drop=True)
+            print("index_window:", index_window)
+            tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
+                          # mean of thorax quat in window
+                          statistics.mean(tor.iloc[index_window:index_window + window_size, 2]),
+                          statistics.mean(tor.iloc[index_window:index_window + window_size, 3]),
+                          statistics.mean(tor.iloc[index_window:index_window + window_size, 4])]
+            abd_pose_w = [statistics.mean(abd.iloc[index_window:index_window + window_size, 1]),
+                          statistics.mean(abd.iloc[index_window:index_window + window_size, 2]),
+                          statistics.mean(abd.iloc[index_window:index_window + window_size, 3]),
+                          statistics.mean(abd.iloc[index_window:index_window + window_size, 4])]
+            ref_pose_w = [statistics.mean(ref.iloc[index_window:index_window + window_size, 1]),
+                          statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
+                          statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
+                          statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
+            Tor_pose = []
+            while len(Tor_pose) < len(tor):
+                Tor_pose.append(tor_pose_w)
+            tor_array = tor.rename_axis().values
+            index_window += 1
 
     index_data += 1  # global
-    count += 1
-    if count > window_size:
-        count = 0
+    i += 1
+    if flag >= 50:
+        flag = 0
+        plt.clf()
         plt.subplot(3, 1, 1)
         plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
         plt.plot(tor[['1', '2', '3', '4']])
@@ -217,8 +234,8 @@ while index_data < length:
         plt.plot(ref[['1', '2', '3', '4']])
         plt.pause(0.01)
 
-
-#plot eventually remaining data
+# plot eventually remaining data
+plt.clf()
 plt.subplot(3, 1, 1)
 plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
 plt.plot(tor[['1', '2', '3', '4']])
@@ -231,6 +248,6 @@ plt.plot(ref[['1', '2', '3', '4']])
 
 plt.show()
 
-#data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
-#data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
-#data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
+# data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
+# data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
+# data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
