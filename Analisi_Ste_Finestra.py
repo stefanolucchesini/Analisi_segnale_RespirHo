@@ -7,7 +7,6 @@ skip_chunks_start = 0  # number of intial chunks to skip
 skip_chunks_end = 0  # number of final chunks to skip
 
 import warnings
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 import math
@@ -22,7 +21,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('test1.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('out.txt', sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
 
@@ -204,7 +203,7 @@ while index_data < length:
                 method='ffill').fillna(method='bfill')
             # ref = ref.reset_index(drop=True)
             print("index_window+window_size:", index_window+window_size)
-            print("ref just after interpol\n", ref.head(index_window+window_size))
+            #print("ref just after interpol\n", ref.head(index_window+window_size))
             # mean of thorax quat in window
             tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
                           statistics.mean(tor.iloc[index_window:index_window + window_size, 2]),
@@ -223,7 +222,7 @@ while index_data < length:
                 Ref_pose.append(ref_pose_w)
             tor_array = tor.iloc[:index_window + window_size, 1:5].rename_axis().values  #takes the 4 quaternions, excludes battery voltage
             ref_array = ref.iloc[:index_window + window_size, 1:5].rename_axis().values
-            print("ref", ref.head(index_window+window_size))
+            #print("ref", ref.head(index_window+window_size))
 
             print("len tor", len(tor))
             print("len tor array", len(tor_array))
@@ -251,25 +250,28 @@ while index_data < length:
 
             interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size, min_periods=49, center=True).mean()
             t1 = t1 - interp_T
-            FuseT_1 = pca.fit_transform(t1)  # PCA thorax
-
-
+            new = pca.fit_transform(t1)  # PCA thorax
+            if index_window == 0:
+                FuseT_1 = new
+            else:
+                FuseT_1 = np.append(FuseT_1, new[-1])
+            print(len(FuseT_1))
             index_window += 1
 
     index_data += 1  # global
-    if flag >= 50:
+    if flag >= 1:
         flag = 0
         plt.clf()
-        plt.subplot(4, 1, 1)
+        plt.subplot(3, 1, 1)
         plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
         plt.plot(tor[['1', '2', '3', '4']])
-        plt.subplot(4, 1, 2)
-        plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
-        plt.plot(abd[['1', '2', '3', '4']])
-        plt.subplot(4, 1, 3)
+        #plt.subplot(4, 1, 2)
+        #plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
+        #plt.plot(abd[['1', '2', '3', '4']])
+        plt.subplot(3, 1, 2)
         plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
         plt.plot(ref[['1', '2', '3', '4']])
-        plt.subplot(4, 1, 4)
+        plt.subplot(3, 1, 3)
         plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting (AT THE END)')
         plt.plot(FuseT_1, color='gold')
 
@@ -277,16 +279,16 @@ while index_data < length:
 
 # plot eventually remaining data
 plt.clf()
-plt.subplot(4, 1, 1)
+plt.subplot(3, 1, 1)
 plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
 plt.plot(tor[['1', '2', '3', '4']])
-plt.subplot(4, 1, 2)
-plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
-plt.plot(abd[['1', '2', '3', '4']])
-plt.subplot(4, 1, 3)
+#plt.subplot(4, 1, 2)
+#plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
+#plt.plot(abd[['1', '2', '3', '4']])
+plt.subplot(3, 1, 2)
 plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
 plt.plot(ref[['1', '2', '3', '4']])
-plt.subplot(4, 1, 4)
+plt.subplot(3, 1, 3)
 plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting (AT THE END)')
 plt.plot(FuseT_1, color='gold')
 
