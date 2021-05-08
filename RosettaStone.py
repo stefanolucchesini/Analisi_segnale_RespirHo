@@ -4,8 +4,7 @@ import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-
-data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_O.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -47,7 +46,9 @@ data_3['nthvalue'] = data_3['nthvalue'].apply(int, base=16)
 
 max_value = max_value - 1
 # add an empty row when there is a "jump" in communication, when the nth value is not received
-data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1bef.csv', index=False, header=True)
+# data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1bef.csv', index=False, header=True)
+print("Aggiungo dati mancanti invalidati")
+
 for i in range(max_value):
     for j in range(256):
         if data_1['nthvalue'][j + i * 256] != j:
@@ -59,7 +60,7 @@ for i in range(max_value):
             data_1 = data_1.reset_index(drop=True)
 data_1 = data_1.iloc[:max_value * 256]
 
-data_2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2bef.csv', index=False, header=True)
+# data_2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2bef.csv', index=False, header=True)
 for i in range(max_value):
     for j in range(256):
         if data_2['nthvalue'][j + i * 256] != j:
@@ -98,18 +99,21 @@ print("Numero di campioni finali da unita' 1: ", data_1_len)
 print("Numero di campioni finali da unita' 2: ", data_2_len)
 print("Numero di campioni finali da unita' 3: ", data_3_len)
 
-data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
-data_2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
-data_3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
-
+# data_1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
+# data_2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
+# data_3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
+print("Creo dataframe nel nuovo formato")
 converted_df = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
+if data_1_len == data_2_len and data_3_len == data_2_len:
+    for i in range(data_1_len):
+        converted_df = converted_df.append(data_1.iloc[i])
+        converted_df = converted_df.append(data_2.iloc[i])
+        converted_df = converted_df.append(data_3.iloc[i])
+else:
+    print("ERRORE! I 3 DATAFRAME NON HANNO LA SOLITA LUNGHEZZA")
 
-for i in range(data_1_len):
-    converted_df = converted_df.append(data_1.iloc[i])
-    converted_df = converted_df.append(data_2.iloc[i])
-    converted_df = converted_df.append(data_3.iloc[i])
-    print(converted_df)
-
+print(converted_df)
 converted_df = converted_df.reset_index(drop=True)  # reset the indexes order
-converted_df.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\out.txt', header=None, index=None, sep=',')
+converted_df.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\Stefano_L_O_new.txt', header=None, index=None,
+                    sep=',')
 print("FINE")
