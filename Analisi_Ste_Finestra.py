@@ -2,7 +2,7 @@ globals().clear()
 
 window_size = 31  # samples inside the window (must be >=SgolayWindowPCA!!)   97 for original MA
 SgolayWindowPCA = 15  # original: 31
-
+start = 0  # number of initial samples to skip
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -112,7 +112,7 @@ abd_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
 FuseT_1, FuseA_1 = [], []
 Tor_pose, Ref_pose, Abd_pose = [], [], []
 
-index_data = 0  # global index for total data
+index_data = start  # global index for total data
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
@@ -136,7 +136,7 @@ while index_data < length:
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
         data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria
-        print("Il nan è a", index_data)
+        print("Il nan è a", index_data, "ed è il device", data.iloc[index_data, 0])
 
     # Creazione dataframe del Reference (3)
     check = data.iloc[index_data].str.contains('03')
@@ -161,7 +161,7 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_abd)  # device 1 conversion
         index_abd += 1
-
+        print(abd)
     # Creazione dataframe del torace (1)
     check = data.iloc[index_data].str.contains('01')
     if check['DevID'] == True:  # se device id è 1
@@ -266,7 +266,8 @@ while index_data < length:
                                                                                center=True).mean()
             t1 = t1 - interp_T
             a1 = a1 - interp_A
-            print(t1.isnull().values.any())
+
+            # print(t1.isnull().values.any())
             newT = pca.fit_transform(t1)  # PCA thorax
             newA = pca.fit_transform(a1)  # PCA abdomen
             if index_window == 0:
