@@ -1,9 +1,17 @@
 globals().clear()
-
-window_size = 31  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
-SgolayWindowPCA = 15  # original: 31
+#PARAMETERS SELECTION
+window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
+SgolayWindowPCA = 31  # original: 31
 start = 0  # number of initial samples to skip
 incr = 25  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
+static_f_threshold_max = 1  # Static, Cycling
+walking_f_threshold_max = 0.75  # 0.75
+static_f_threshold_min = 0.05
+walking_f_threshold_min = 0.2
+
+f_threshold_min = walking_f_threshold_min
+f_threshold_max = walking_f_threshold_max
+
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -21,7 +29,9 @@ plt.rcParams.update({'figure.max_open_warning': 0})
 data = pd.read_csv('Stefano_L_A_new.txt', sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
-
+fdev = (len(data) / 3) / 300
+SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
+SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 
 # data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
 
@@ -125,7 +135,7 @@ print("Il dataset ha", length, "campioni")
 #  PARTE ITERATIVA DEL CODICE
 
 while index_data < length:
-    print("INDEX:", index_data)
+    print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index_data] = data.iloc[index_data].astype(str)
     data.iloc[index_data] = data.iloc[index_data].str.replace('[', '')
@@ -162,7 +172,7 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_abd)  # device 1 conversion
         index_abd += 1
-        #print(abd)
+        # print(abd)
     # Creazione dataframe del torace (1)
     check = data.iloc[index_data].str.contains('01')
     if check['DevID'] == True:  # se device id è 1
@@ -176,7 +186,7 @@ while index_data < length:
         index_tor += 1
 
     # INSIDE THE WINDOW
-    if index_tor + index_abd + index_ref >= 3 * (window_size + 1) and index_tor > index_window+window_size:
+    if index_tor + index_abd + index_ref >= 3 * (window_size + 1) and index_tor > index_window + window_size:
         print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
         if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
             flag += 1  # time to plot
@@ -275,21 +285,141 @@ while index_data < length:
                 FuseT_1 = newT
                 FuseA_1 = newA
             else:
-                FuseT_1 = np.append(FuseT_1, newT[window_size-incr:])  # adds last element of the computed PCA array
-                FuseA_1 = np.append(FuseA_1, newA[window_size-incr:])
+                FuseT_1 = np.append(FuseT_1, newT[window_size - incr:])  # adds last element of the computed PCA array
+                FuseA_1 = np.append(FuseA_1, newA[window_size - incr:])
             print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
             # PEAK DETECTION
+            # Thorax
             EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
             diff_T = max(EstimSmoothT) - min(EstimSmoothT)
             thr_T = diff_T * 5 / 100
             Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
-            Index_T = Index_T[0]
+            Index_T = Index_T[0]  # ‘peak_heights’ selection
+            fStimVec_T = []
+            if len(Index_T) > 2:  #at least 2 peaks are needed to compute the intrapeak distance
+                print("len index_T", len(Index_T))
+                for i in range(len(Index_T) - 1):
+                    intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
+                    fstim = 1 / intrapeak
+                    fStimVec_T.append(fstim)
+                fStimMean_T = statistics.mean(fStimVec_T)
+                fStimstd_T = statistics.stdev(fStimVec_T)
+                lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
+                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=300, noverlap=50,
+                                                nfft=512,
+                                                detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
+            # Abdomen
             EstimSmoothA = scipy.signal.savgol_filter(np.ravel(FuseA_1), SgolayWindowPCA,
                                                       3)  # Savitzky-Golay filter application
             diff_A = max(EstimSmoothA) - min(EstimSmoothA)
             thr_A = diff_A * 5 / 100
             Index_A = scipy.signal.find_peaks(EstimSmoothA, distance=6, prominence=thr_A)  # find peaks
             Index_A = Index_A[0]
+            fStimVec_A = []
+            if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                print("len index_A", len(Index_A))
+                for i in range(len(Index_A) - 1):
+                    intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
+                    fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
+                    fStimVec_A.append(fstim)
+                fStimMean_A = statistics.mean(fStimVec_A)
+                fStimstd_A = statistics.stdev(fStimVec_A)
+                lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
+                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=300, noverlap=50,
+                                                nfft=512,
+                                                detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
+            if len(Index_A) > 2 and len(Index_T) > 2:  #the two thresholds are surely defined
+                lowThreshold = min(lowThreshold_A,
+                                   lowThreshold_T)  # the low threshold is computed as the minimum between the thoracic and the abdominal one
+                #ABDOMEN MAXIMA AND MINIMA DETECTION
+                Signal_A = -FuseA_1
+                start_A = np.where(f_A > lowThreshold)[0][0] - 1
+                end_A = np.where(f_A > f_threshold_max)[0][0]
+                fBmax_A = max(pxx_A[start_A:end_A])  # breathing frequency as the highest peak
+                fBI_A = np.where(pxx_A[start_A:end_A] == fBmax_A)[0][0]  # max (breathing frequency) postion
+                fBspectrum_A = f_A[fBI_A + start_A]  # value retrieved from position in f_A
+                f1 = max(f_threshold_min, fBspectrum_A - 0.4)
+                f2 = min(fBspectrum_A + 0.4, f_threshold_max)
+                ft_pl = f2
+                Wn_pl = ft_pl / (fdev / 2)
+                b, a = scipy.signal.butter(1, 0.15, 'lowpass')  # low pass filter (Butterworth) b, a = scipy.signal.butter(1, Wn_pl, 'lowpass')
+                lowfilt_A = scipy.signal.filtfilt(b, a, np.ravel(Signal_A))
+                ft_ph = f1
+                Wn_ph = ft_ph / (fdev / 2)
+                b, a = scipy.signal.butter(1, Wn_ph, 'highpass')  # high pass filter (the result is the bandpass filtered version)
+                bpfilt_A = scipy.signal.filtfilt(b, a, lowfilt_A)
+                # parameters setting on empirical basis
+                if fBspectrum_A * 60 < 12:
+                    perc_A = 15
+                    distance_A = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
+                    SgolayWindow = 15
+                elif 12 < fBspectrum_A * 60 < 20:
+                    perc_A = 8
+                    distance_A = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
+                    SgolayWindow = 11
+                else:
+                    perc_A = 5
+                    distance_A = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
+                    SgolayWindow = 9
+                SmoothSmoothA = scipy.signal.savgol_filter(bpfilt_A, SgolayWindow, 3)
+                diff_SSA = max(SmoothSmoothA) - min(SmoothSmoothA)
+                thr_SSA = diff_SSA * perc_A / 100
+                Max_Ind_A = scipy.signal.find_peaks(SmoothSmoothA, distance=distance_A, prominence=thr_SSA)
+                Max_Ind_A = Max_Ind_A[0]
+                Maxima_A = SmoothSmoothA[Max_Ind_A]
+                Min_Ind_A = []
+                Minima_A = []
+                for i in range(len(Max_Ind_A) - 1):
+                    min_value = min(SmoothSmoothA[Max_Ind_A[i]:Max_Ind_A[i + 1]])
+                    Minima_A.append(min_value)
+                    min_index = np.argmin(SmoothSmoothA[Max_Ind_A[i]:Max_Ind_A[i + 1]]) + Max_Ind_A[i]
+                    Min_Ind_A.append(min_index)
+                #THORAX MAXIMA AND MINIMA DETECTION
+                Signal_T = FuseT_1
+                start_T = np.where(f_T > lowThreshold)[0][0] - 1
+                end_T = np.where(f_T > f_threshold_max)[0][0]
+                fBmax_T = max(pxx_T[start_T:end_T])
+                fBI_T = np.where(pxx_T[start_T:end_T] == fBmax_T)[0][0]
+                fBspectrum_T = f_T[fBI_T + start_T]
+                f1 = max(f_threshold_min, fBspectrum_T - 0.4)
+                f2 = min(fBspectrum_T + 0.4, f_threshold_max)
+                ft_pl = f2
+                Wn_pl = ft_pl / (fdev / 2)
+                b, a = scipy.signal.butter(1, 0.15, 'lowpass')
+                lowfilt_T = scipy.signal.filtfilt(b, a, np.ravel(Signal_T))
+                ft_ph = f1
+                Wn_ph = ft_ph / (fdev / 2)
+                b, a = scipy.signal.butter(1, Wn_ph,
+                                           'highpass')  # high pass filter (the result is the bandpass filtered version)
+                bpfilt_T = scipy.signal.filtfilt(b, a, lowfilt_T)
+                if fBspectrum_T * 60 < 12:
+                    perc_T = 15
+                    distance_T = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
+                    SgolayWindow = 15
+                elif 12 < fBspectrum_T * 60 < 20:
+                    perc_T = 8
+                    distance_T = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
+                    SgolayWindow = 11
+                else:
+                    perc_T = 5
+                    distance_T = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
+                    SgolayWindow = 9
+                SmoothSmoothT = scipy.signal.savgol_filter(bpfilt_T, SgolayWindow, 3)
+                diff_SST = max(SmoothSmoothT) - min(SmoothSmoothT)
+                thr_SST = diff_SST * perc_T / 100
+                Max_Ind_T = scipy.signal.find_peaks(SmoothSmoothT, distance=distance_T, prominence=thr_SST)
+                Max_Ind_T = Max_Ind_T[0]
+                Maxima_T = SmoothSmoothT[Max_Ind_T]
+                Min_Ind_T = []
+                Minima_T = []
+                for i in range(len(Max_Ind_T) - 1):
+                    min_value = min(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]])
+                    Minima_T.append(min_value)
+                    min_index = np.argmin(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]]) + Max_Ind_T[i]
+                    Min_Ind_T.append(min_index)
+                # UP TO line 616 - FROM 742 in ANALISI FINALE-----STILL TO ADD LINES BETWEEN 616 AND 742!!!
+
+
 
             index_window += 1
 
@@ -298,47 +428,65 @@ while index_data < length:
         flag = 0
         index_window += incr
         plt.clf()
-        plt.subplot(3, 1, 1)
-        plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-        plt.plot(tor[['1', '2', '3', '4']])
-        plt.subplot(3, 1, 2)
+        plt.subplot(4, 1, 1)
+        # plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
+        # plt.plot(tor[['1', '2', '3', '4']])
+        # plt.subplot(4, 1, 2)
         # plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
         # plt.plot(abd[['1', '2', '3', '4']])
         plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
         plt.plot(FuseA_1, color='gold')
         plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
         plt.plot(EstimSmoothA, color='red')
-        # plt.subplot(3, 1, 2)
         # plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
         # plt.plot(ref[['1', '2', '3', '4']])
-        plt.subplot(3, 1, 3)
-        plt.title('1° PCA Th comp + filtering&positive peaks highlighting')
+        plt.subplot(4, 1, 2)
+        plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
         plt.plot(FuseT_1, color='gold')
         plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
         plt.plot(EstimSmoothT, color='red')
+        plt.subplot(4, 1, 3)
+        plt.plot(SmoothSmoothA)
+        plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
+        plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
+        plt.title('Abdomen signal with (Max-Min) highlight')
+        plt.subplot(4, 1, 4)
+        plt.plot(SmoothSmoothT)
+        plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+        plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+        plt.title('Thorax signal with (Max-Min) highlight')
 
         plt.pause(0.01)
 
 # plot eventually remaining data
 plt.clf()
-plt.subplot(3, 1, 1)
-plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-plt.plot(tor[['1', '2', '3', '4']])
+plt.subplot(4, 1, 1)
+#plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
+#plt.plot(tor[['1', '2', '3', '4']])
 # plt.subplot(4, 1, 2)
 # plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
 # plt.plot(abd[['1', '2', '3', '4']])
-plt.subplot(3, 1, 2)
 plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
 plt.plot(FuseA_1, color='gold')
 plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
 plt.plot(EstimSmoothA, color='red')
 # plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
 # plt.plot(ref[['1', '2', '3', '4']])
-plt.subplot(3, 1, 3)
+plt.subplot(4, 1, 2)
 plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
 plt.plot(FuseT_1, color='gold')
 plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
 plt.plot(EstimSmoothT, color='red')
+plt.subplot(4, 1, 3)
+plt.plot(SmoothSmoothA)
+plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
+plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
+plt.title('Abdomen signal with (Max-Min) highlight')
+plt.subplot(4, 1, 4)
+plt.plot(SmoothSmoothT)
+plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+plt.title('Thorax signal with (Max-Min) highlight')
 
 plt.show()
 
