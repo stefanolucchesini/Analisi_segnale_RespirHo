@@ -1,8 +1,9 @@
 globals().clear()
 
-window_size = 31  # samples inside the window (must be >=SgolayWindowPCA!!)   97 for original MA
+window_size = 31  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
 SgolayWindowPCA = 15  # original: 31
 start = 0  # number of initial samples to skip
+incr = 25  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -161,7 +162,7 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_abd)  # device 1 conversion
         index_abd += 1
-        print(abd)
+        #print(abd)
     # Creazione dataframe del torace (1)
     check = data.iloc[index_data].str.contains('01')
     if check['DevID'] == True:  # se device id è 1
@@ -175,7 +176,7 @@ while index_data < length:
         index_tor += 1
 
     # INSIDE THE WINDOW
-    if index_tor + index_abd + index_ref >= 3 * window_size + 3:
+    if index_tor + index_abd + index_ref >= 3 * (window_size + 1) and index_tor > index_window+window_size:
         print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
         if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
             flag += 1  # time to plot
@@ -274,9 +275,9 @@ while index_data < length:
                 FuseT_1 = newT
                 FuseA_1 = newA
             else:
-                FuseT_1 = np.append(FuseT_1, newT[-1])  # adds last element of the computed PCA array
-                FuseA_1 = np.append(FuseA_1, newA[-1])
-            print(len(FuseT_1), len(FuseA_1))
+                FuseT_1 = np.append(FuseT_1, newT[window_size-incr:])  # adds last element of the computed PCA array
+                FuseA_1 = np.append(FuseA_1, newA[window_size-incr:])
+            print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
             # PEAK DETECTION
             EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
             diff_T = max(EstimSmoothT) - min(EstimSmoothT)
@@ -293,8 +294,9 @@ while index_data < length:
             index_window += 1
 
     index_data += 1  # global
-    if flag >= 1:
+    if flag == 1:
         flag = 0
+        index_window += incr
         plt.clf()
         plt.subplot(3, 1, 1)
         plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
