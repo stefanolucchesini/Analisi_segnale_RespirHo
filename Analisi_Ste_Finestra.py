@@ -23,6 +23,7 @@ from pyquaternion import Quaternion
 import numpy as np
 import scipy.signal
 from sklearn.decomposition import PCA
+import scipy.stats as stats
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
@@ -32,7 +33,7 @@ data = data.reset_index(drop=True)  # reset the indexes order
 fdev = (len(data) / 3) / 300
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
 SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
-
+SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot, Min_Ind_Tot, Minima_Tot = 0, 0, 0, 0, 0
 # data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
 
 def quatsconv(device, i):
@@ -417,9 +418,157 @@ while index_data < length:
                     Minima_T.append(min_value)
                     min_index = np.argmin(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]]) + Max_Ind_T[i]
                     Min_Ind_T.append(min_index)
-                # UP TO line 616 - FROM 742 in ANALISI FINALE-----STILL TO ADD LINES BETWEEN 616 AND 742!!!
+                #RESPIRATORY PARAMETERS ABDOMEN
+                T_A = []
+                Ti_A = []
+                Te_A = []
+                TiTe_A = []
+                fB_A = []
+                for i in range(len(Min_Ind_A)):
+                    te = (Min_Ind_A[i] - Max_Ind_A[i]) / fdev
+                    ti = (Max_Ind_A[i + 1] - Min_Ind_A[i]) / fdev
+                    Ti_A.append(ti)
+                    Te_A.append(te)
+                    ti_te = ti / te
+                    TiTe_A.append(ti / te)
+                    ttot = ti + te
+                    fb = 1 / ttot * 60
+                    T_A.append(ttot)
+                    fB_A.append(fb)
+                Tmean_A = statistics.mean(T_A)
+                Timean_A = statistics.mean(Ti_A)
+                Temean_A = statistics.mean(Te_A)
+                fBmean_A = statistics.mean(fB_A)
+                fBspectrum_A = fBspectrum_A * 60
+                TiTemean_A = statistics.mean(TiTe_A)
+                duty_mean_A = statistics.mean([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                Tstd_A = statistics.stdev(T_A)
+                Tistd_A = statistics.stdev(Ti_A)
+                Testd_A = statistics.stdev(Te_A)
+                fBstd_A = statistics.stdev(fB_A)
+                TiTestd_A = statistics.stdev(TiTe_A)
+                duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                PCA_A = [fBmean_A, Timean_A, Temean_A, TiTemean_A, duty_mean_A]
+                SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
+                #RESPIRATORY PARAMETERS THORAX
+                T_T = []
+                Ti_T = []
+                Te_T = []
+                TiTe_T = []
+                fB_T = []
+                for i in range(len(Min_Ind_T)):
+                    te = (Min_Ind_T[i] - Max_Ind_T[i]) / fdev
+                    ti = (Max_Ind_T[i + 1] - Min_Ind_T[i]) / fdev
+                    Ti_T.append(ti)
+                    Te_T.append(te)
+                    ti_te = ti / te
+                    TiTe_T.append(ti / te)
+                    ttot = ti + te
+                    fb = 1 / ttot * 60
+                    T_T.append(ttot)
+                    fB_T.append(fb)
+                Tmean_T = statistics.mean(T_T)
+                Timean_T = statistics.mean(Ti_T)
+                Temean_T = statistics.mean(Te_T)
+                fBmean_T = statistics.mean(fB_T)
+                fBspectrum_T = fBspectrum_T * 60
+                TiTemean_T = statistics.mean(TiTe_T)
+                duty_mean_T = statistics.mean([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                Tstd_T = statistics.stdev(T_T)
+                Tistd_T = statistics.stdev(Ti_T)
+                Testd_T = statistics.stdev(Te_T)
+                fBstd_T = statistics.stdev(fB_T)
+                TiTestd_T = statistics.stdev(TiTe_T)
+                duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
+                SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                #TOTAL RESPIRATORY SIGNAL
+                SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
+                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=300, noverlap=50,
+                                                    nfft=512, detrend=False)
+                start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
+                end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
+                fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
+                fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
+                nmax = np.where(f_Tot > 1)[0][0]
+                fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
+                print(fBspectrum_Tot * 60)
+                if fBspectrum_Tot * 60 < 12:
+                    perc_Tot = 15
+                    distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
+                    SgolayWindow = 15
+                elif 12 < fBspectrum_Tot * 60 < 20:
+                    perc_Tot = 8
+                    distance_Tot = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
+                    SgolayWindow = 11
+                else:
+                    perc_Tot = 5
+                    distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
+                    SgolayWindow = 9
+                diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
+                thr_SSTot = diff_SSTot * perc_Tot / 100
 
-
+                Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
+                Max_Ind_Tot = Max_Ind_Tot[0]
+                Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
+                Min_Ind_Tot = []
+                Minima_Tot = []
+                for i in range(len(Max_Ind_Tot) - 1):
+                    min_value = min(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]])
+                    Minima_Tot.append(min_value)
+                    min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
+                    Min_Ind_Tot.append(min_index)
+                #TOTAL RESPIRATORY PARAMS
+                T_Tot = []
+                Ti_Tot = []
+                Te_Tot = []
+                TiTe_Tot = []
+                fB_Tot = []
+                VTi_Tot = []
+                VTe_Tot = []
+                VT_Tot = []
+                for i in range(len(Min_Ind_Tot)):
+                    te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
+                    ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
+                    vti = SmoothSmoothTot[Max_Ind_Tot[i + 1]] - SmoothSmoothTot[Min_Ind_Tot[i]]
+                    vte = SmoothSmoothTot[Min_Ind_Tot[i]] - SmoothSmoothTot[Max_Ind_Tot[i]]
+                    vt = (vti + vte) / 2
+                    Ti_Tot.append(ti)
+                    Te_Tot.append(te)
+                    ti_te = ti / te
+                    TiTe_Tot.append(ti / te)
+                    ttot = ti + te
+                    fb = 1 / ttot * 60
+                    T_Tot.append(ttot)
+                    fB_Tot.append(fb)
+                    VTi_Tot.append(vti)
+                    VTe_Tot.append(vte)
+                    VT_Tot.append(vt)
+                Tmean_Tot = statistics.mean(T_Tot)
+                Timean_Tot = statistics.mean(Ti_Tot)
+                Temean_Tot = statistics.mean(Te_Tot)
+                fBmean_Tot = statistics.mean(fB_Tot)
+                fBspectrum_Tot = fBspectrum_Tot * 60
+                TiTemean_Tot = statistics.mean(TiTe_Tot)
+                duty_mean_Tot = statistics.mean([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                PCA_Tot = [fBmean_Tot, Timean_Tot, Temean_Tot, TiTemean_Tot, duty_mean_Tot]
+                Tmed_Tot = statistics.median(T_Tot)
+                Timed_Tot = statistics.median(Ti_Tot)
+                Temed_Tot = statistics.median(Te_Tot)
+                fBmed_Tot = statistics.median(fB_Tot)
+                fBspectrum_T = fBspectrum_T * 60
+                TiTemed_Tot = statistics.median(TiTe_T)
+                duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                VT_med_Tot = statistics.median(VT_Tot)
+                Tirq_Tot = stats.iqr(T_Tot)
+                Tiirq_Tot = stats.iqr(Ti_Tot)
+                Teirq_Tot = stats.iqr(Te_Tot)
+                fBirq_Tot = stats.iqr(fB_Tot)
+                TiTeirq_Tot = stats.iqr(TiTe_Tot)
+                duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, fdev]
+                Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
+                #FILE ANALISI_FINALE COMPLETE!
 
             index_window += 1
 
@@ -451,10 +600,23 @@ while index_data < length:
         plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
         plt.title('Abdomen signal with (Max-Min) highlight')
         plt.subplot(4, 1, 4)
-        plt.plot(SmoothSmoothT)
-        plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
-        plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-        plt.title('Thorax signal with (Max-Min) highlight')
+        #plt.plot(SmoothSmoothT)
+        #plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+        #plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+        #plt.title('Thorax signal with (Max-Min) highlight')
+
+
+        #plt.plot(f_Tot, pxx_Tot)
+        #plt.xlabel('Frequency (Hz)')
+        #plt.ylabel('Magnitude')
+        #plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
+       # plt.title('Total Spectrum and maximum')
+
+
+        plt.plot(SmoothSmoothTot)
+        plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
+        plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
+        plt.title('Total (Max-Min)')
 
         plt.pause(0.01)
 
