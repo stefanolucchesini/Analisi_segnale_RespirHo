@@ -27,14 +27,18 @@ import scipy.stats as stats
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_A_new.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_B_new.txt', sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
 fdev = (len(data) / 3) / 300
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
 SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot, Min_Ind_Tot, Minima_Tot = 0, 0, 0, 0, 0
+pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
+f_Tot = [0]
+
 # data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
+
 
 def quatsconv(device, i):
     if device == 3:
@@ -103,6 +107,62 @@ def quatsconv(device, i):
     return
 
 
+def plotupdate():
+    plt.clf()
+    plt.figure(1)
+    plt.subplot(5, 1, 1)
+    plt.title('Quaternions of device 1')
+    plt.plot(tor['1'], color='red')
+    plt.plot(tor['2'], color='green')
+    plt.plot(tor['3'], color='skyblue')
+    plt.plot(tor['4'], color='orange')
+    plt.subplot(5, 1, 2)
+    plt.title('Quaternions of device 2')
+    plt.plot(abd['1'], color='red')
+    plt.plot(abd['2'], color='green')
+    plt.plot(abd['3'], color='skyblue')
+    plt.plot(abd['4'], color='orange')
+    plt.subplot(5, 1, 3)
+    plt.title('Quaternions of device 3')
+    plt.plot(ref['1'], color='red')
+    plt.plot(ref['2'], color='green')
+    plt.plot(ref['3'], color='skyblue')
+    plt.plot(ref['4'], color='orange')
+    plt.subplot(5, 1, 4)
+    plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
+    plt.plot(FuseA_1, color='gold')
+    plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
+    plt.plot(EstimSmoothA, color='red')
+    plt.subplot(5, 1, 5)
+    plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
+    plt.plot(FuseT_1, color='gold')
+    plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+    plt.plot(EstimSmoothT, color='red')
+    plt.figure(2)
+    plt.subplot(4, 1, 1)
+    plt.title('Abdomen signal with (Max-Min) highlight')
+    plt.plot(SmoothSmoothA)
+    plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
+    plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
+    plt.subplot(4, 1, 2)
+    plt.title('Thorax signal with (Max-Min) highlight')
+    plt.plot(SmoothSmoothT)
+    plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+    plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+    plt.subplot(4, 1, 3)
+    plt.title('Total (Max-Min)')
+    plt.plot(SmoothSmoothTot)
+    plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
+    plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
+    plt.subplot(4, 1, 4)
+    if index_window > 10:
+        plt.plot(f_Tot, pxx_Tot)
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Magnitude')
+        plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
+        plt.title('Total Spectrum and maximum')
+
+    return
 # data of devices 1,2,3
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
@@ -467,21 +527,22 @@ while index_data < length:
                     fb = 1 / ttot * 60
                     T_T.append(ttot)
                     fB_T.append(fb)
-                Tmean_T = statistics.mean(T_T)
-                Timean_T = statistics.mean(Ti_T)
-                Temean_T = statistics.mean(Te_T)
-                fBmean_T = statistics.mean(fB_T)
-                fBspectrum_T = fBspectrum_T * 60
-                TiTemean_T = statistics.mean(TiTe_T)
-                duty_mean_T = statistics.mean([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                Tstd_T = statistics.stdev(T_T)
-                Tistd_T = statistics.stdev(Ti_T)
-                Testd_T = statistics.stdev(Te_T)
-                fBstd_T = statistics.stdev(fB_T)
-                TiTestd_T = statistics.stdev(TiTe_T)
-                duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
-                SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                if len(T_T) > 2:
+                    Tmean_T = statistics.mean(T_T)
+                    Timean_T = statistics.mean(Ti_T)
+                    Temean_T = statistics.mean(Te_T)
+                    fBmean_T = statistics.mean(fB_T)
+                    fBspectrum_T = fBspectrum_T * 60
+                    TiTemean_T = statistics.mean(TiTe_T)
+                    duty_mean_T = statistics.mean([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                    Tstd_T = statistics.stdev(T_T)
+                    Tistd_T = statistics.stdev(Ti_T)
+                    Testd_T = statistics.stdev(Te_T)
+                    fBstd_T = statistics.stdev(fB_T)
+                    TiTestd_T = statistics.stdev(TiTe_T)
+                    duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                    PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
+                    SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
                 #TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
                 f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=300, noverlap=50,
@@ -544,30 +605,31 @@ while index_data < length:
                     VTi_Tot.append(vti)
                     VTe_Tot.append(vte)
                     VT_Tot.append(vt)
-                Tmean_Tot = statistics.mean(T_Tot)
-                Timean_Tot = statistics.mean(Ti_Tot)
-                Temean_Tot = statistics.mean(Te_Tot)
-                fBmean_Tot = statistics.mean(fB_Tot)
-                fBspectrum_Tot = fBspectrum_Tot * 60
-                TiTemean_Tot = statistics.mean(TiTe_Tot)
-                duty_mean_Tot = statistics.mean([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                PCA_Tot = [fBmean_Tot, Timean_Tot, Temean_Tot, TiTemean_Tot, duty_mean_Tot]
-                Tmed_Tot = statistics.median(T_Tot)
-                Timed_Tot = statistics.median(Ti_Tot)
-                Temed_Tot = statistics.median(Te_Tot)
-                fBmed_Tot = statistics.median(fB_Tot)
-                fBspectrum_T = fBspectrum_T * 60
-                TiTemed_Tot = statistics.median(TiTe_T)
-                duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                VT_med_Tot = statistics.median(VT_Tot)
-                Tirq_Tot = stats.iqr(T_Tot)
-                Tiirq_Tot = stats.iqr(Ti_Tot)
-                Teirq_Tot = stats.iqr(Te_Tot)
-                fBirq_Tot = stats.iqr(fB_Tot)
-                TiTeirq_Tot = stats.iqr(TiTe_Tot)
-                duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, fdev]
-                Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
+                if len(T_Tot) > 2:
+                    Tmean_Tot = statistics.mean(T_Tot)
+                    Timean_Tot = statistics.mean(Ti_Tot)
+                    Temean_Tot = statistics.mean(Te_Tot)
+                    fBmean_Tot = statistics.mean(fB_Tot)
+                    fBspectrum_Tot = fBspectrum_Tot * 60
+                    TiTemean_Tot = statistics.mean(TiTe_Tot)
+                    duty_mean_Tot = statistics.mean([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                    PCA_Tot = [fBmean_Tot, Timean_Tot, Temean_Tot, TiTemean_Tot, duty_mean_Tot]
+                    Tmed_Tot = statistics.median(T_Tot)
+                    Timed_Tot = statistics.median(Ti_Tot)
+                    Temed_Tot = statistics.median(Te_Tot)
+                    fBmed_Tot = statistics.median(fB_Tot)
+                    fBspectrum_T = fBspectrum_T * 60
+                    TiTemed_Tot = statistics.median(TiTe_T)
+                    duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                    VT_med_Tot = statistics.median(VT_Tot)
+                    Tirq_Tot = stats.iqr(T_Tot)
+                    Tiirq_Tot = stats.iqr(Ti_Tot)
+                    Teirq_Tot = stats.iqr(Te_Tot)
+                    fBirq_Tot = stats.iqr(fB_Tot)
+                    TiTeirq_Tot = stats.iqr(TiTe_Tot)
+                    duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, fdev]
+                    Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
                 #FILE ANALISI_FINALE COMPLETE!
 
             index_window += 1
@@ -576,80 +638,11 @@ while index_data < length:
     if flag == 1:
         flag = 0
         index_window += incr
-        plt.clf()
-        plt.subplot(4, 1, 1)
-        # plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-        # plt.plot(tor[['1', '2', '3', '4']])
-        # plt.subplot(4, 1, 2)
-        # plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
-        # plt.plot(abd[['1', '2', '3', '4']])
-        plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
-        plt.plot(FuseA_1, color='gold')
-        plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
-        plt.plot(EstimSmoothA, color='red')
-        # plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
-        # plt.plot(ref[['1', '2', '3', '4']])
-        plt.subplot(4, 1, 2)
-        plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
-        plt.plot(FuseT_1, color='gold')
-        plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-        plt.plot(EstimSmoothT, color='red')
-        plt.subplot(4, 1, 3)
-        plt.plot(SmoothSmoothA)
-        plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
-        plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-        plt.title('Abdomen signal with (Max-Min) highlight')
-        plt.subplot(4, 1, 4)
-        #plt.plot(SmoothSmoothT)
-        #plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
-        #plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-        #plt.title('Thorax signal with (Max-Min) highlight')
-
-
-        #plt.plot(f_Tot, pxx_Tot)
-        #plt.xlabel('Frequency (Hz)')
-        #plt.ylabel('Magnitude')
-        #plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
-       # plt.title('Total Spectrum and maximum')
-
-
-        plt.plot(SmoothSmoothTot)
-        plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
-        plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
-        plt.title('Total (Max-Min)')
-
+        plotupdate()
         plt.pause(0.01)
 
 # plot eventually remaining data
-plt.clf()
-plt.subplot(4, 1, 1)
-#plt.title('Quaternions 1,2,3,4 of device 1 (thorax)')
-#plt.plot(tor[['1', '2', '3', '4']])
-# plt.subplot(4, 1, 2)
-# plt.title('Quaternions 1,2,3,4 of device 2 (abdomen)')
-# plt.plot(abd[['1', '2', '3', '4']])
-plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
-plt.plot(FuseA_1, color='gold')
-plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
-plt.plot(EstimSmoothA, color='red')
-# plt.title('Quaternions 1,2,3,4 of device 3 (reference)')
-# plt.plot(ref[['1', '2', '3', '4']])
-plt.subplot(4, 1, 2)
-plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
-plt.plot(FuseT_1, color='gold')
-plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-plt.plot(EstimSmoothT, color='red')
-plt.subplot(4, 1, 3)
-plt.plot(SmoothSmoothA)
-plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
-plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-plt.title('Abdomen signal with (Max-Min) highlight')
-plt.subplot(4, 1, 4)
-plt.plot(SmoothSmoothT)
-plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
-plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-plt.title('Thorax signal with (Max-Min) highlight')
-
+plotupdate()
 plt.show()
 
 # data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
