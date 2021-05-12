@@ -1,9 +1,10 @@
 globals().clear()
 #PARAMETERS SELECTION
+filename = 'Stefano_L_C_new.txt'
 window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
 SgolayWindowPCA = 31  # original: 31
-start = 0  # number of initial samples to skip
-incr = 25  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
+start = 600  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+incr = 30  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
 static_f_threshold_max = 1  # Static, Cycling
 walking_f_threshold_max = 0.75  # 0.75
 static_f_threshold_min = 0.05
@@ -12,9 +13,6 @@ walking_f_threshold_min = 0.2
 f_threshold_min = walking_f_threshold_min
 f_threshold_max = walking_f_threshold_max
 
-import warnings
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
@@ -24,20 +22,9 @@ import numpy as np
 import scipy.signal
 from sklearn.decomposition import PCA
 import scipy.stats as stats
+import warnings
 
-plt.rcParams.update({'figure.max_open_warning': 0})
-
-data = pd.read_csv('Stefano_L_B_new.txt', sep=",|:", header=None, engine='python')
-data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
-data = data.reset_index(drop=True)  # reset the indexes order
-fdev = (len(data) / 3) / 300
-SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
-SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
-SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot, Min_Ind_Tot, Minima_Tot = 0, 0, 0, 0, 0
-pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
-f_Tot = [0]
-
-# data.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data.csv', index = False, header=True)
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 def quatsconv(device, i):
@@ -139,62 +126,74 @@ def plotupdate():
     plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
     plt.plot(EstimSmoothT, color='red')
     plt.figure(2)
-    plt.subplot(4, 1, 1)
+    plt.subplot(5, 1, 1)
     plt.title('Abdomen signal with (Max-Min) highlight')
     plt.plot(SmoothSmoothA)
     plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
     plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-    plt.subplot(4, 1, 2)
+    plt.subplot(5, 1, 2)
     plt.title('Thorax signal with (Max-Min) highlight')
     plt.plot(SmoothSmoothT)
     plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
     plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-    plt.subplot(4, 1, 3)
+    plt.subplot(5, 1, 3)
     plt.title('Total (Max-Min)')
     plt.plot(SmoothSmoothTot)
     plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
     plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
-    plt.subplot(4, 1, 4)
+    plt.subplot(5, 1, 4)
     if index_window > 10:
         plt.plot(f_Tot, pxx_Tot)
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Magnitude')
         plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
         plt.title('Total Spectrum and maximum')
+    plt.subplot(5, 1, 5)
+    height = [Tot_Iqr[1], Tot_Iqr[2], Tot_Iqr[3]]
+    bars = ('Ti', 'Te', 'DC')
+    y_pos = np.arange(len(bars))
+    # Create bars
+    plt.bar(y_pos, height)
+    # Create names on the x-axis
+    plt.xticks(y_pos, bars)
 
     return
+
+
+data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
+data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
+data = data.reset_index(drop=True)  # reset the indexes order
 # data of devices 1,2,3
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
-
+#GLOBAL VARIABLES INITIALIZATION
 pca = PCA(n_components=1)
-tor_quat = Quaternion()
-Tor_pose_quat = Quaternion()
+tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
+ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
+abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
 tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-
-ref_quat = Quaternion()
-Ref_pose_quat = Quaternion()
 ref_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-
-abd_quat = Quaternion()
-Abd_pose_quat = Quaternion()
 abd_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-
 FuseT_1, FuseA_1 = [], []
 Tor_pose, Ref_pose, Abd_pose = [], [], []
-
-index_data = start  # global index for total data
+SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
+SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
+SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot, Min_Ind_Tot, Minima_Tot = 0, 0, 0, 0, 0
+pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
+f_Tot = [0]
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
 index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
+fdev = (len(data) / 3) / 300
+
+index_data = 3*start  # global index for total data
 length = len(data)
 print("Il dataset ha", length, "campioni")
 
 #  PARTE ITERATIVA DEL CODICE
-
 while index_data < length:
     print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
@@ -358,7 +357,7 @@ while index_data < length:
             Index_T = Index_T[0]  # ‘peak_heights’ selection
             fStimVec_T = []
             if len(Index_T) > 2:  #at least 2 peaks are needed to compute the intrapeak distance
-                print("len index_T", len(Index_T))
+                #print("len index_T", len(Index_T))
                 for i in range(len(Index_T) - 1):
                     intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                     fstim = 1 / intrapeak
@@ -378,7 +377,7 @@ while index_data < length:
             Index_A = Index_A[0]
             fStimVec_A = []
             if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
-                print("len index_A", len(Index_A))
+                #print("len index_A", len(Index_A))
                 for i in range(len(Index_A) - 1):
                     intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
                     fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
@@ -553,7 +552,6 @@ while index_data < length:
                 fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
                 nmax = np.where(f_Tot > 1)[0][0]
                 fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
-                print(fBspectrum_Tot * 60)
                 if fBspectrum_Tot * 60 < 12:
                     perc_Tot = 15
                     distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
