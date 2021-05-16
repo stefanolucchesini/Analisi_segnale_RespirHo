@@ -30,7 +30,7 @@ import matplotlib.animation as animation
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
-data = pd.read_csv('Stefano_L_E.txt', sep=",|:", header=None, engine='python')
+data = pd.read_csv('Stefano_L_A.txt', sep=",|:", header=None, engine='python')
 data.columns = ['TxRx', 'DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'None']
 # select only the Rx line
 data = data.loc[data['TxRx'] == 'Rx']
@@ -906,6 +906,6 @@ duty_irq_Tot = stats.iqr([float(Ti_Tot/T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T
 Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot,  fdev]
 print(Tot_med)
 Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-#
+print(Tot_Iqr)
 plt.show()
 #

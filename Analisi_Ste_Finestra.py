@@ -1,10 +1,12 @@
 globals().clear()
-#PARAMETERS SELECTION
-filename = 'Stefano_L_C_new.txt'
+# PARAMETERS SELECTION
+filename = 'Stefano_L_A_new.txt'
 window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
 SgolayWindowPCA = 31  # original: 31
-start = 600  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 30  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
+batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
+
 static_f_threshold_max = 1  # Static, Cycling
 walking_f_threshold_max = 0.75  # 0.75
 static_f_threshold_min = 0.05
@@ -96,6 +98,7 @@ def quatsconv(device, i):
 
 def plotupdate():
     plt.clf()
+    # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
     plt.figure(1)
     plt.subplot(5, 1, 1)
     plt.title('Quaternions of device 1')
@@ -125,38 +128,42 @@ def plotupdate():
     plt.plot(FuseT_1, color='gold')
     plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
     plt.plot(EstimSmoothT, color='red')
+    # CREAZIONE FINESTRA 2: SEGNALE RESPIRATORIO E SPETTRO
     plt.figure(2)
-    plt.subplot(5, 1, 1)
+    plt.subplot(4, 1, 1)
     plt.title('Abdomen signal with (Max-Min) highlight')
     plt.plot(SmoothSmoothA)
     plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
     plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-    plt.subplot(5, 1, 2)
+    plt.subplot(4, 1, 2)
     plt.title('Thorax signal with (Max-Min) highlight')
     plt.plot(SmoothSmoothT)
     plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
     plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-    plt.subplot(5, 1, 3)
-    plt.title('Total (Max-Min)')
+    plt.subplot(4, 1, 3)
+    plt.title('Total with (Max-Min) highlight')
     plt.plot(SmoothSmoothTot)
     plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
     plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
-    plt.subplot(5, 1, 4)
+    plt.subplot(4, 1, 4)
     if index_window > 10:
         plt.plot(f_Tot, pxx_Tot)
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Magnitude')
         plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
         plt.title('Total Spectrum and maximum')
-    plt.subplot(5, 1, 5)
-    height = [Tot_Iqr[1], Tot_Iqr[2], Tot_Iqr[3]]
-    bars = ('Ti', 'Te', 'DC')
-    y_pos = np.arange(len(bars))
-    # Create bars
-    plt.bar(y_pos, height)
-    # Create names on the x-axis
-    plt.xticks(y_pos, bars)
-
+    # CREAZIONE FINESTRA 3: TENSIONE BATTERIE
+    if batteryplot:
+        plt.figure(3)
+        plt.subplot(3, 1, 1)
+        plt.title('Battery voltage of device 1')
+        plt.plot(tor['B'], color='red')
+        plt.subplot(3, 1, 2)
+        plt.title('Battery voltage of device 2')
+        plt.plot(abd['B'], color='red')
+        plt.subplot(3, 1, 3)
+        plt.title('Battery voltage of device 3')
+        plt.plot(ref['B'], color='red')
     return
 
 
@@ -167,7 +174,7 @@ data = data.reset_index(drop=True)  # reset the indexes order
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
-#GLOBAL VARIABLES INITIALIZATION
+# GLOBAL VARIABLES INITIALIZATION
 pca = PCA(n_components=1)
 tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
 ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
@@ -189,7 +196,7 @@ index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
 fdev = (len(data) / 3) / 300
 
-index_data = 3*start  # global index for total data
+index_data = 3 * start  # global index for total data
 length = len(data)
 print("Il dataset ha", length, "campioni")
 
@@ -207,11 +214,11 @@ while index_data < length:
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
         data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria
-        print("Il nan è a", index_data, "ed è il device", data.iloc[index_data, 0])
+        # print("Il nan è a", index_data, "ed è il device", data.iloc[index_data, 0])
 
-    # Creazione dataframe del Reference (3)
+    # Reference (3) dataframe extension
     check = data.iloc[index_data].str.contains('03')
-    if check['DevID'] == True:  # se device id è 3
+    if check['DevID']:  # se device id è 3
         # mette il dato nel dataframe del terzo device
         ref = ref.append(data.iloc[index_data])
         ref = ref.reset_index(drop=True)
@@ -221,9 +228,9 @@ while index_data < length:
         quatsconv(3, index_ref)  # device 3 conversion
         index_ref += 1
 
-    # Creazione dataframe dell'addome (2)
+    # Abdomen (2) dataframe extension
     check = data.iloc[index_data].str.contains('2')
-    if check['DevID'] == True:  # se device id è 2
+    if check['DevID']:  # se device id è 2
         # mette il dato nel dataframe del terzo device
         abd = abd.append(data.iloc[index_data])
         abd = abd.reset_index(drop=True)
@@ -233,9 +240,9 @@ while index_data < length:
         quatsconv(2, index_abd)  # device 1 conversion
         index_abd += 1
         # print(abd)
-    # Creazione dataframe del torace (1)
+    # Thorax (1) dataframe extension
     check = data.iloc[index_data].str.contains('01')
-    if check['DevID'] == True:  # se device id è 1
+    if check['DevID']:  # se device id è 1
         # mette il dato nel dataframe del terzo device
         tor = tor.append(data.iloc[index_data])
         tor = tor.reset_index(drop=True)
@@ -247,7 +254,7 @@ while index_data < length:
 
     # INSIDE THE WINDOW
     if index_tor + index_abd + index_ref >= 3 * (window_size + 1) and index_tor > index_window + window_size:
-        print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
+        # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
         if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
             flag += 1  # time to plot
             index_tor_old = index_tor
@@ -273,7 +280,7 @@ while index_data < length:
                                                                 index_window:index_window + window_size].fillna(
                 method='ffill').fillna(method='bfill')
             # ref = ref.reset_index(drop=True)
-            print("index_window+window_size:", index_window + window_size)
+            # print("index_window+window_size:", index_window + window_size)
             # print("tor just after interpol\n", tor.head(index_window+window_size))
             # mean of thorax quat in window
             tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
@@ -347,7 +354,7 @@ while index_data < length:
             else:
                 FuseT_1 = np.append(FuseT_1, newT[window_size - incr:])  # adds last element of the computed PCA array
                 FuseA_1 = np.append(FuseA_1, newA[window_size - incr:])
-            print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
+            # print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
             # PEAK DETECTION
             # Thorax
             EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
@@ -356,8 +363,8 @@ while index_data < length:
             Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
             Index_T = Index_T[0]  # ‘peak_heights’ selection
             fStimVec_T = []
-            if len(Index_T) > 2:  #at least 2 peaks are needed to compute the intrapeak distance
-                #print("len index_T", len(Index_T))
+            if len(Index_T) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                # print("len index_T", len(Index_T))
                 for i in range(len(Index_T) - 1):
                     intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                     fstim = 1 / intrapeak
@@ -377,7 +384,7 @@ while index_data < length:
             Index_A = Index_A[0]
             fStimVec_A = []
             if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
-                #print("len index_A", len(Index_A))
+                # print("len index_A", len(Index_A))
                 for i in range(len(Index_A) - 1):
                     intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
                     fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
@@ -388,10 +395,10 @@ while index_data < length:
                 f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=300, noverlap=50,
                                                 nfft=512,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
-            if len(Index_A) > 2 and len(Index_T) > 2:  #the two thresholds are surely defined
+            if len(Index_A) > 2 and len(Index_T) > 2:  # the two thresholds are surely defined
                 lowThreshold = min(lowThreshold_A,
                                    lowThreshold_T)  # the low threshold is computed as the minimum between the thoracic and the abdominal one
-                #ABDOMEN MAXIMA AND MINIMA DETECTION
+                # ABDOMEN MAXIMA AND MINIMA DETECTION
                 Signal_A = -FuseA_1
                 start_A = np.where(f_A > lowThreshold)[0][0] - 1
                 end_A = np.where(f_A > f_threshold_max)[0][0]
@@ -402,11 +409,13 @@ while index_data < length:
                 f2 = min(fBspectrum_A + 0.4, f_threshold_max)
                 ft_pl = f2
                 Wn_pl = ft_pl / (fdev / 2)
-                b, a = scipy.signal.butter(1, 0.15, 'lowpass')  # low pass filter (Butterworth) b, a = scipy.signal.butter(1, Wn_pl, 'lowpass')
+                b, a = scipy.signal.butter(1, 0.15,
+                                           'lowpass')  # low pass filter (Butterworth) b, a = scipy.signal.butter(1, Wn_pl, 'lowpass')
                 lowfilt_A = scipy.signal.filtfilt(b, a, np.ravel(Signal_A))
                 ft_ph = f1
                 Wn_ph = ft_ph / (fdev / 2)
-                b, a = scipy.signal.butter(1, Wn_ph, 'highpass')  # high pass filter (the result is the bandpass filtered version)
+                b, a = scipy.signal.butter(1, Wn_ph,
+                                           'highpass')  # high pass filter (the result is the bandpass filtered version)
                 bpfilt_A = scipy.signal.filtfilt(b, a, lowfilt_A)
                 # parameters setting on empirical basis
                 if fBspectrum_A * 60 < 12:
@@ -434,7 +443,7 @@ while index_data < length:
                     Minima_A.append(min_value)
                     min_index = np.argmin(SmoothSmoothA[Max_Ind_A[i]:Max_Ind_A[i + 1]]) + Max_Ind_A[i]
                     Min_Ind_A.append(min_index)
-                #THORAX MAXIMA AND MINIMA DETECTION
+                # THORAX MAXIMA AND MINIMA DETECTION
                 Signal_T = FuseT_1
                 start_T = np.where(f_T > lowThreshold)[0][0] - 1
                 end_T = np.where(f_T > f_threshold_max)[0][0]
@@ -477,7 +486,7 @@ while index_data < length:
                     Minima_T.append(min_value)
                     min_index = np.argmin(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]]) + Max_Ind_T[i]
                     Min_Ind_T.append(min_index)
-                #RESPIRATORY PARAMETERS ABDOMEN
+                # RESPIRATORY PARAMETERS ABDOMEN
                 T_A = []
                 Ti_A = []
                 Te_A = []
@@ -509,7 +518,7 @@ while index_data < length:
                 duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                 PCA_A = [fBmean_A, Timean_A, Temean_A, TiTemean_A, duty_mean_A]
                 SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
-                #RESPIRATORY PARAMETERS THORAX
+                # RESPIRATORY PARAMETERS THORAX
                 T_T = []
                 Ti_T = []
                 Te_T = []
@@ -542,10 +551,10 @@ while index_data < length:
                     duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                     PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
-                #TOTAL RESPIRATORY SIGNAL
+                # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
                 f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=300, noverlap=50,
-                                                    nfft=512, detrend=False)
+                                                    nfft=512, detrend=False)  # Power spectral density computation
                 start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
                 end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
                 fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
@@ -577,7 +586,7 @@ while index_data < length:
                     Minima_Tot.append(min_value)
                     min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
                     Min_Ind_Tot.append(min_index)
-                #TOTAL RESPIRATORY PARAMS
+                # TOTAL RESPIRATORY PARAMS
                 T_Tot = []
                 Ti_Tot = []
                 Te_Tot = []
@@ -626,9 +635,11 @@ while index_data < length:
                     fBirq_Tot = stats.iqr(fB_Tot)
                     TiTeirq_Tot = stats.iqr(TiTe_Tot)
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, fdev]
+                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-                #FILE ANALISI_FINALE COMPLETE!
+                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot\n", Tot_Iqr)
+                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
+                # FILE ANALISI_FINALE COMPLETE!
 
             index_window += 1
 
@@ -640,9 +651,10 @@ while index_data < length:
         plt.pause(0.01)
 
 # plot eventually remaining data
+print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot\n", Tot_Iqr)
+print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
 plotupdate()
 plt.show()
-
 # data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
 # data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
 # data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
