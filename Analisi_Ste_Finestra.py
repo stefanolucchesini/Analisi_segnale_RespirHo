@@ -1,17 +1,21 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_A_new.txt'
-window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA)   97 for original MA
-SgolayWindowPCA = 31  # original: 31
+filename = 'Stefano_L_B_new.txt'
+window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-incr = 30  # It's the overlapping between a window and the following one. If it's 1, max overlap. MUST BE < window_size. The higher the faster
+incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE < window_size. The higher the faster
+#fdev = (len(data) / 3) / 300
+fdev = 10
+# PLOTTING OPTIONS
+w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
+w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
-
+# THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
-walking_f_threshold_max = 0.75  # 0.75
+walking_f_threshold_max = 2  # 0.75
 static_f_threshold_min = 0.05
 walking_f_threshold_min = 0.2
-
 f_threshold_min = walking_f_threshold_min
 f_threshold_max = walking_f_threshold_max
 
@@ -98,62 +102,64 @@ def quatsconv(device, i):
 
 def plotupdate():
     plt.clf()
-    # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
-    plt.figure(1)
-    plt.subplot(5, 1, 1)
-    plt.title('Quaternions of device 1')
-    plt.plot(tor['1'], color='red')
-    plt.plot(tor['2'], color='green')
-    plt.plot(tor['3'], color='skyblue')
-    plt.plot(tor['4'], color='orange')
-    plt.subplot(5, 1, 2)
-    plt.title('Quaternions of device 2')
-    plt.plot(abd['1'], color='red')
-    plt.plot(abd['2'], color='green')
-    plt.plot(abd['3'], color='skyblue')
-    plt.plot(abd['4'], color='orange')
-    plt.subplot(5, 1, 3)
-    plt.title('Quaternions of device 3')
-    plt.plot(ref['1'], color='red')
-    plt.plot(ref['2'], color='green')
-    plt.plot(ref['3'], color='skyblue')
-    plt.plot(ref['4'], color='orange')
-    plt.subplot(5, 1, 4)
-    plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
-    plt.plot(FuseA_1, color='gold')
-    plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
-    plt.plot(EstimSmoothA, color='red')
-    plt.subplot(5, 1, 5)
-    plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
-    plt.plot(FuseT_1, color='gold')
-    plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-    plt.plot(EstimSmoothT, color='red')
-    # CREAZIONE FINESTRA 2: SEGNALE RESPIRATORIO E SPETTRO
-    plt.figure(2)
-    plt.subplot(4, 1, 1)
-    plt.title('Abdomen signal with (Max-Min) highlight')
-    plt.plot(SmoothSmoothA)
-    plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
-    plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-    plt.subplot(4, 1, 2)
-    plt.title('Thorax signal with (Max-Min) highlight')
-    plt.plot(SmoothSmoothT)
-    plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
-    plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-    plt.subplot(4, 1, 3)
-    plt.title('Total with (Max-Min) highlight')
-    plt.plot(SmoothSmoothTot)
-    plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
-    plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
-    plt.subplot(4, 1, 4)
-    if index_window > 10:
-        plt.plot(f_Tot, pxx_Tot)
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Magnitude')
-        plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
-        plt.title('Total Spectrum and maximum')
-    # CREAZIONE FINESTRA 3: TENSIONE BATTERIE
+    if w1plot:
+        # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
+        plt.figure(1)
+        plt.subplot(5, 1, 1)
+        plt.title('Quaternions of device 1')
+        plt.plot(tor['1'], color='red')
+        plt.plot(tor['2'], color='green')
+        plt.plot(tor['3'], color='skyblue')
+        plt.plot(tor['4'], color='orange')
+        plt.subplot(5, 1, 2)
+        plt.title('Quaternions of device 2')
+        plt.plot(abd['1'], color='red')
+        plt.plot(abd['2'], color='green')
+        plt.plot(abd['3'], color='skyblue')
+        plt.plot(abd['4'], color='orange')
+        plt.subplot(5, 1, 3)
+        plt.title('Quaternions of device 3')
+        plt.plot(ref['1'], color='red')
+        plt.plot(ref['2'], color='green')
+        plt.plot(ref['3'], color='skyblue')
+        plt.plot(ref['4'], color='orange')
+        plt.subplot(5, 1, 4)
+        plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
+        plt.plot(FuseA_1, color='gold')
+        plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
+        plt.plot(EstimSmoothA, color='red')
+        plt.subplot(5, 1, 5)
+        plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
+        plt.plot(FuseT_1, color='gold')
+        plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+        plt.plot(EstimSmoothT, color='red')
+    if w2plot:
+        # CREAZIONE FINESTRA 2: SEGNALE RESPIRATORIO E SPETTRO
+        plt.figure(2)
+        plt.subplot(4, 1, 1)
+        plt.title('Abdomen signal with (Max-Min) highlight')
+        plt.plot(SmoothSmoothA)
+        plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
+        plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
+        plt.subplot(4, 1, 2)
+        plt.title('Thorax signal with (Max-Min) highlight')
+        plt.plot(SmoothSmoothT)
+        plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+        plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+        plt.subplot(4, 1, 3)
+        plt.title('Total with (Max-Min) highlight')
+        plt.plot(SmoothSmoothTot)
+        plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
+        plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
+        plt.subplot(4, 1, 4)
+        if index_window > 10:
+            plt.plot(f_Tot, pxx_Tot)
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Magnitude')
+            plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
+            plt.title('Total Spectrum and maximum')
     if batteryplot:
+        # CREAZIONE FINESTRA 3: TENSIONE BATTERIE
         plt.figure(3)
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
@@ -194,7 +200,6 @@ index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
 index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
-fdev = (len(data) / 3) / 300
 
 index_data = 3 * start  # global index for total data
 length = len(data)
@@ -372,7 +377,7 @@ while index_data < length:
                 fStimMean_T = statistics.mean(fStimVec_T)
                 fStimstd_T = statistics.stdev(fStimVec_T)
                 lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
-                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=300, noverlap=50,
+                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=50,
                                                 nfft=512,
                                                 detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
             # Abdomen
@@ -392,7 +397,7 @@ while index_data < length:
                 fStimMean_A = statistics.mean(fStimVec_A)
                 fStimstd_A = statistics.stdev(fStimVec_A)
                 lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
-                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=300, noverlap=50,
+                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=window_size, noverlap=50,
                                                 nfft=512,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
             if len(Index_A) > 2 and len(Index_T) > 2:  # the two thresholds are surely defined
@@ -553,7 +558,7 @@ while index_data < length:
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
-                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=300, noverlap=50,
+                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=window_size, noverlap=50,
                                                     nfft=512, detrend=False)  # Power spectral density computation
                 start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
                 end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
@@ -606,13 +611,14 @@ while index_data < length:
                     ti_te = ti / te
                     TiTe_Tot.append(ti / te)
                     ttot = ti + te
-                    fb = 1 / ttot * 60
+                    fb = (1 / ttot) * 60
                     T_Tot.append(ttot)
                     fB_Tot.append(fb)
                     VTi_Tot.append(vti)
                     VTe_Tot.append(vte)
                     VT_Tot.append(vt)
                 if len(T_Tot) > 2:
+                    #MEDIA
                     Tmean_Tot = statistics.mean(T_Tot)
                     Timean_Tot = statistics.mean(Ti_Tot)
                     Temean_Tot = statistics.mean(Te_Tot)
@@ -621,6 +627,7 @@ while index_data < length:
                     TiTemean_Tot = statistics.mean(TiTe_Tot)
                     duty_mean_Tot = statistics.mean([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     PCA_Tot = [fBmean_Tot, Timean_Tot, Temean_Tot, TiTemean_Tot, duty_mean_Tot]
+                    #MEDIANA
                     Tmed_Tot = statistics.median(T_Tot)
                     Timed_Tot = statistics.median(Ti_Tot)
                     Temed_Tot = statistics.median(Te_Tot)
@@ -629,15 +636,16 @@ while index_data < length:
                     TiTemed_Tot = statistics.median(TiTe_T)
                     duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     VT_med_Tot = statistics.median(VT_Tot)
+                    #INTERQUARTILE
                     Tirq_Tot = stats.iqr(T_Tot)
                     Tiirq_Tot = stats.iqr(Ti_Tot)
                     Teirq_Tot = stats.iqr(Te_Tot)
                     fBirq_Tot = stats.iqr(fB_Tot)
                     TiTeirq_Tot = stats.iqr(TiTe_Tot)
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot]
+                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot\n", Tot_Iqr)
+                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
                     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
                 # FILE ANALISI_FINALE COMPLETE!
 
@@ -651,8 +659,9 @@ while index_data < length:
         plt.pause(0.01)
 
 # plot eventually remaining data
-print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_mean_Tot\n", Tot_Iqr)
+print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
 print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
+print("END")
 plotupdate()
 plt.show()
 # data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
