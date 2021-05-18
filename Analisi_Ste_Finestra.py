@@ -1,12 +1,12 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_B_new.txt'
+filename = 'Stefano_L_A_new.txt'
 window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE < window_size. The higher the faster
 #fdev = (len(data) / 3) / 300
-fdev = 10
+fdev = 15
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -176,18 +176,20 @@ def plotupdate():
 data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
-# data of devices 1,2,3
+
+# GLOBAL VARIABLES INITIALIZATION
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
-# GLOBAL VARIABLES INITIALIZATION
+tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
+ref_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
+abd_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
+t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
+a1 = pd.DataFrame(columns=['1', '2', '3', '4'])
 pca = PCA(n_components=1)
 tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
 ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
 abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
-tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-ref_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-abd_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
 FuseT_1, FuseA_1 = [], []
 Tor_pose, Ref_pose, Abd_pose = [], [], []
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
@@ -218,7 +220,7 @@ while index_data < length:
     # Mette NAN ai quaternioni se il pacchetto è invalido
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
-        data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria
+        data.iloc[index_data, 1] = np.nan  # mette nan anche al valore della batteria (colonna B)
         # print("Il nan è a", index_data, "ed è il device", data.iloc[index_data, 0])
 
     # Reference (3) dataframe extension
@@ -232,7 +234,6 @@ while index_data < length:
         # conversion of quaternions in range [-1:1]
         quatsconv(3, index_ref)  # device 3 conversion
         index_ref += 1
-
     # Abdomen (2) dataframe extension
     check = data.iloc[index_data].str.contains('2')
     if check['DevID']:  # se device id è 2
@@ -258,10 +259,10 @@ while index_data < length:
         index_tor += 1
 
     # INSIDE THE WINDOW
-    if index_tor + index_abd + index_ref >= 3 * (window_size + 1) and index_tor > index_window + window_size:
+    if index_tor + index_abd + index_ref > 3 * window_size and index_tor > index_window + window_size:
         # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
         if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
-            flag += 1  # time to plot
+            flag = 1  # time to plot
             index_tor_old = index_tor
             index_ref_old = index_ref
             index_abd_old = index_abd
@@ -311,8 +312,6 @@ while index_data < length:
             # print("ref", ref.head(index_window+window_size))
             Tor_Ok_array = tor_pose.rename_axis().values
             Ref_Ok_array = ref_pose.rename_axis().values
-            t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
-            a1 = pd.DataFrame(columns=['1', '2', '3', '4'])
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
@@ -351,8 +350,8 @@ while index_data < length:
             a1 = a1 - interp_A
 
             # print(t1.isnull().values.any())
-            newT = pca.fit_transform(t1)  # PCA thorax
-            newA = pca.fit_transform(a1)  # PCA abdomen
+            newT = pca.fit_transform(t1.loc[index_window:index_window + window_size])  # PCA thorax
+            newA = pca.fit_transform(a1.loc[index_window:index_window + window_size])  # PCA abdomen
             if index_window == 0:
                 FuseT_1 = newT
                 FuseA_1 = newA
@@ -658,7 +657,7 @@ while index_data < length:
         plotupdate()
         plt.pause(0.01)
 
-# plot eventually remaining data
+#END OF WHILE CYCLE. Plot eventually remaining data
 print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
 print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
 print("END")
