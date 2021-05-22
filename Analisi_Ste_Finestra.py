@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_E_new.txt'
+filename = 'Stefano_L_A_new.txt'
 window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
@@ -197,9 +197,7 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
-#Respiratory params initialization
-T_Tot, Ti_Tot, Te_Tot, TiTe_Tot, fB_Tot, VTi_Tot, VTe_Tot, VT_Tot = [], [], [], [], [], [], [], []
-Min_Ind_Tot, Minima_Tot = [], []
+Min_Ind_Tot, Minima_Tot = [], [] #for plotting
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
@@ -560,8 +558,8 @@ while index_data < length:
                     print("Errore calcolo tor:", e)
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
-                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=window_size, noverlap=50,
-                                                    nfft=512, detrend=False)  # Power spectral density computation
+                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=window_size, noverlap=incr,
+                                                    nfft=window_size, detrend=False)  # Power spectral density computation
                 start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
                 end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
                 fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
@@ -594,6 +592,7 @@ while index_data < length:
                     min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
                     Min_Ind_Tot.append(min_index)
                 # TOTAL RESPIRATORY PARAMS
+                T_Tot, Ti_Tot, Te_Tot, TiTe_Tot, fB_Tot, VTi_Tot, VTe_Tot, VT_Tot = [], [], [], [], [], [], [], []
                 for i in range(len(Min_Ind_Tot)):
                     te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
                     ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
@@ -613,6 +612,7 @@ while index_data < length:
                     VT_Tot.append(vt)
                 try:
                     #MEDIA
+                    print(len(Min_Ind_T))
                     Tmean_Tot = statistics.mean(T_Tot)
                     Timean_Tot = statistics.mean(Ti_Tot)
                     Temean_Tot = statistics.mean(Te_Tot)
