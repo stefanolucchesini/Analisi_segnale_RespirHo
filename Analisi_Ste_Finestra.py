@@ -1,19 +1,19 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_A_new.txt'
+filename = 'Stefano_L_E_new.txt'
 window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE < window_size. The higher the faster
 #fdev = (len(data) / 3) / 300
-fdev = 15
+fdev = 10
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
-walking_f_threshold_max = 2  # 0.75
+walking_f_threshold_max = 1  # 0.75
 static_f_threshold_min = 0.05
 walking_f_threshold_min = 0.2
 f_threshold_min = walking_f_threshold_min
@@ -194,9 +194,12 @@ FuseT_1, FuseA_1 = [], []
 Tor_pose, Ref_pose, Abd_pose = [], [], []
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
 SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
-SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot, Min_Ind_Tot, Minima_Tot = 0, 0, 0, 0, 0
+SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
+#Respiratory params initialization
+T_Tot, Ti_Tot, Te_Tot, TiTe_Tot, fB_Tot, VTi_Tot, VTe_Tot, VT_Tot = [], [], [], [], [], [], [], []
+Min_Ind_Tot, Minima_Tot = [], []
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
@@ -206,10 +209,9 @@ flag = 0  # used for plotting after first window is available
 index_data = 3 * start  # global index for total data
 length = len(data)
 print("Il dataset ha", length, "campioni")
-
 #  PARTE ITERATIVA DEL CODICE
 while index_data < length:
-    print("GLOBAL INDEX:", index_data)
+    #print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index_data] = data.iloc[index_data].astype(str)
     data.iloc[index_data] = data.iloc[index_data].str.replace('[', '')
@@ -301,7 +303,7 @@ while index_data < length:
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-            while len(Tor_pose) < len(tor):
+            while len(Tor_pose) < len(tor):  # len(tor)=len(abd)=len(ref)!
                 Tor_pose.append(tor_pose_w)
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
@@ -310,12 +312,10 @@ while index_data < length:
             ref_array = ref.iloc[:index_window + window_size, 1:5].rename_axis().values
             abd_array = abd.iloc[:index_window + window_size, 1:5].rename_axis().values
             # print("ref", ref.head(index_window+window_size))
-            Tor_Ok_array = tor_pose.rename_axis().values
-            Ref_Ok_array = ref_pose.rename_axis().values
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
-                tor_quat = Quaternion(tor_array[i])
+                tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
                 Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
                 tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
                 tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
@@ -326,7 +326,7 @@ while index_data < length:
                 abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
                 # REFERENCE QUATERNION COMPUTATION
                 ref_quat = Quaternion(ref_array[i])
-                Ref_pose_quat = Quaternion(Ref_pose[i])  # quaternion conjugate
+                Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
                 ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
                 ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
                 # THORAX COMPONENT
@@ -350,18 +350,21 @@ while index_data < length:
             a1 = a1 - interp_A
 
             # print(t1.isnull().values.any())
-            newT = pca.fit_transform(t1.loc[index_window:index_window + window_size])  # PCA thorax
+            newT = pca.fit_transform(t1.loc[index_window:index_window + window_size])  # PCA thorax. len(newT)= window_size!!
             newA = pca.fit_transform(a1.loc[index_window:index_window + window_size])  # PCA abdomen
-            if index_window == 0:
+            if index_window == 0: #prima iterazione
                 FuseT_1 = newT
                 FuseA_1 = newA
+                EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
+                EstimSmoothA = scipy.signal.savgol_filter(np.ravel(FuseA_1), SgolayWindowPCA, 3)
             else:
-                FuseT_1 = np.append(FuseT_1, newT[window_size - incr:])  # adds last element of the computed PCA array
+                FuseT_1 = np.append(FuseT_1, newT[window_size - incr:])  # adds last elements of the computed PCA array
                 FuseA_1 = np.append(FuseA_1, newA[window_size - incr:])
+                EstimSmoothT = np.append(EstimSmoothT, scipy.signal.savgol_filter(np.ravel(newT[window_size - incr:]), SgolayWindowPCA, 3))  # filtra il segnale
+                EstimSmoothA = np.append(EstimSmoothA, scipy.signal.savgol_filter(np.ravel(newA[window_size - incr:]), SgolayWindowPCA, 3))
             # print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
             # PEAK DETECTION
             # Thorax
-            EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
             diff_T = max(EstimSmoothT) - min(EstimSmoothT)
             thr_T = diff_T * 5 / 100
             Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
@@ -376,12 +379,10 @@ while index_data < length:
                 fStimMean_T = statistics.mean(fStimVec_T)
                 fStimstd_T = statistics.stdev(fStimVec_T)
                 lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
-                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=50,
-                                                nfft=512,
+                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
+                                                nfft=window_size,
                                                 detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
             # Abdomen
-            EstimSmoothA = scipy.signal.savgol_filter(np.ravel(FuseA_1), SgolayWindowPCA,
-                                                      3)  # Savitzky-Golay filter application
             diff_A = max(EstimSmoothA) - min(EstimSmoothA)
             thr_A = diff_A * 5 / 100
             Index_A = scipy.signal.find_peaks(EstimSmoothA, distance=6, prominence=thr_A)  # find peaks
@@ -396,8 +397,8 @@ while index_data < length:
                 fStimMean_A = statistics.mean(fStimVec_A)
                 fStimstd_A = statistics.stdev(fStimVec_A)
                 lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
-                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=window_size, noverlap=50,
-                                                nfft=512,
+                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=window_size, noverlap=incr,
+                                                nfft=window_size,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
             if len(Index_A) > 2 and len(Index_T) > 2:  # the two thresholds are surely defined
                 lowThreshold = min(lowThreshold_A,
@@ -539,7 +540,7 @@ while index_data < length:
                     fb = 1 / ttot * 60
                     T_T.append(ttot)
                     fB_T.append(fb)
-                if len(T_T) > 2:
+                try:
                     Tmean_T = statistics.mean(T_T)
                     Timean_T = statistics.mean(Ti_T)
                     Temean_T = statistics.mean(Te_T)
@@ -555,6 +556,8 @@ while index_data < length:
                     duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                     PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                except Exception as e:
+                    print("Errore calcolo tor:", e)
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
                 f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=window_size, noverlap=50,
@@ -591,14 +594,6 @@ while index_data < length:
                     min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
                     Min_Ind_Tot.append(min_index)
                 # TOTAL RESPIRATORY PARAMS
-                T_Tot = []
-                Ti_Tot = []
-                Te_Tot = []
-                TiTe_Tot = []
-                fB_Tot = []
-                VTi_Tot = []
-                VTe_Tot = []
-                VT_Tot = []
                 for i in range(len(Min_Ind_Tot)):
                     te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
                     ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
@@ -616,7 +611,7 @@ while index_data < length:
                     VTi_Tot.append(vti)
                     VTe_Tot.append(vte)
                     VT_Tot.append(vt)
-                if len(T_Tot) > 2:
+                try:
                     #MEDIA
                     Tmean_Tot = statistics.mean(T_Tot)
                     Timean_Tot = statistics.mean(Ti_Tot)
@@ -645,8 +640,9 @@ while index_data < length:
                     Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
                     print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
-                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
-                # FILE ANALISI_FINALE COMPLETE!
+                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med, "\n")
+                except Exception as e:
+                    print("Errore calcolo totale:", e)
 
             index_window += 1
 
