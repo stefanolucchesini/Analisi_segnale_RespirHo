@@ -1,10 +1,10 @@
 globals().clear()
 # PARAMETERS SELECTION
 filename = 'Stefano_L_A_new.txt'
-window_size = 97  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 80  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE < window_size. The higher the faster
+incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 #fdev = (len(data) / 3) / 300
 fdev = 10
 # PLOTTING OPTIONS
@@ -191,7 +191,7 @@ tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
 ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
 abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
 FuseT_1, FuseA_1 = [], []
-Tor_pose, Ref_pose, Abd_pose = [], [], []
+tor_array, abd_array, ref_array = [], [], []
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
 SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
@@ -259,7 +259,7 @@ while index_data < length:
         index_tor += 1
 
     # INSIDE THE WINDOW
-    if index_tor + index_abd + index_ref > 3 * window_size and index_tor > index_window + window_size:
+    if index_tor + index_abd + index_ref > 3 * (window_size + index_window):
         # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
         if index_tor > index_tor_old and index_abd > index_abd_old and index_ref > index_ref_old:
             flag = 1  # time to plot
@@ -301,14 +301,15 @@ while index_data < length:
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
+            Tor_pose, Ref_pose, Abd_pose = [], [], []
             while len(Tor_pose) < len(tor):  # len(tor)=len(abd)=len(ref)!
                 Tor_pose.append(tor_pose_w)
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
             # takes the 4 quaternions, excludes battery voltage
-            tor_array = tor.iloc[:index_window + window_size, 1:5].rename_axis().values
-            ref_array = ref.iloc[:index_window + window_size, 1:5].rename_axis().values
-            abd_array = abd.iloc[:index_window + window_size, 1:5].rename_axis().values
+            tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
@@ -612,7 +613,6 @@ while index_data < length:
                     VT_Tot.append(vt)
                 try:
                     #MEDIA
-                    print(len(Min_Ind_T))
                     Tmean_Tot = statistics.mean(T_Tot)
                     Timean_Tot = statistics.mean(Ti_Tot)
                     Temean_Tot = statistics.mean(Te_Tot)
@@ -643,8 +643,6 @@ while index_data < length:
                     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med, "\n")
                 except Exception as e:
                     print("Errore calcolo totale:", e)
-
-            index_window += 1
 
     index_data += 1  # global
     if flag == 1:
