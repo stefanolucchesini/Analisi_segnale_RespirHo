@@ -191,7 +191,7 @@ tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
 ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
 abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
 FuseT_1, FuseA_1 = [], []
-tor_array, abd_array, ref_array = [], [], []
+Tor_pose, Ref_pose, Abd_pose = [], [], []
 SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
 SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
@@ -301,15 +301,14 @@ while index_data < length:
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-            Tor_pose, Ref_pose, Abd_pose = [], [], []
             while len(Tor_pose) < len(tor):  # len(tor)=len(abd)=len(ref)!
                 Tor_pose.append(tor_pose_w)
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
             # takes the 4 quaternions, excludes battery voltage
-            tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-            ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-            abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            tor_array = tor.iloc[:index_window + window_size, 1:5].rename_axis().values
+            ref_array = ref.iloc[:index_window + window_size, 1:5].rename_axis().values
+            abd_array = abd.iloc[:index_window + window_size, 1:5].rename_axis().values
             # print("ref", ref.head(index_window+window_size))
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
