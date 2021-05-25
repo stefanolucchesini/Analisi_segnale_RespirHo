@@ -6,7 +6,7 @@ SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 #fdev = (len(data) / 3) / 300
-fdev = 10
+fdev = 6.5
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -396,7 +396,7 @@ while index_data < length:
                 fStimMean_A = statistics.mean(fStimVec_A)
                 fStimstd_A = statistics.stdev(fStimVec_A)
                 lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
-                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=10, window='hamming', nperseg=window_size, noverlap=incr,
+                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
                                                 nfft=window_size,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
             if len(Index_A) > 2 and len(Index_T) > 2:  # the two thresholds are surely defined
@@ -507,21 +507,24 @@ while index_data < length:
                     fb = 1 / ttot * 60
                     T_A.append(ttot)
                     fB_A.append(fb)
-                Tmean_A = statistics.mean(T_A)
-                Timean_A = statistics.mean(Ti_A)
-                Temean_A = statistics.mean(Te_A)
-                fBmean_A = statistics.mean(fB_A)
-                fBspectrum_A = fBspectrum_A * 60
-                TiTemean_A = statistics.mean(TiTe_A)
-                duty_mean_A = statistics.mean([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                Tstd_A = statistics.stdev(T_A)
-                Tistd_A = statistics.stdev(Ti_A)
-                Testd_A = statistics.stdev(Te_A)
-                fBstd_A = statistics.stdev(fB_A)
-                TiTestd_A = statistics.stdev(TiTe_A)
-                duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                PCA_A = [fBmean_A, Timean_A, Temean_A, TiTemean_A, duty_mean_A]
-                SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
+                try:
+                    Tmean_A = statistics.mean(T_A)
+                    Timean_A = statistics.mean(Ti_A)
+                    Temean_A = statistics.mean(Te_A)
+                    fBmean_A = statistics.mean(fB_A)
+                    fBspectrum_A = fBspectrum_A * 60
+                    TiTemean_A = statistics.mean(TiTe_A)
+                    duty_mean_A = statistics.mean([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                    Tstd_A = statistics.stdev(T_A)
+                    Tistd_A = statistics.stdev(Ti_A)
+                    Testd_A = statistics.stdev(Te_A)
+                    fBstd_A = statistics.stdev(fB_A)
+                    TiTestd_A = statistics.stdev(TiTe_A)
+                    duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                    PCA_A = [fBmean_A, Timean_A, Temean_A, TiTemean_A, duty_mean_A]
+                    SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
+                except Exception as e:
+                    print("Errore calcolo abd:", e)
                 # RESPIRATORY PARAMETERS THORAX
                 T_T = []
                 Ti_T = []
@@ -559,7 +562,7 @@ while index_data < length:
                     print("Errore calcolo tor:", e)
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
-                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=10, nperseg=window_size, noverlap=incr,
+                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
                                                     nfft=window_size, detrend=False)  # Power spectral density computation
                 start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
                 end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
@@ -639,8 +642,9 @@ while index_data < length:
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
-                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med, "\n")
+
+                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
+                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
                 except Exception as e:
                     print("Errore calcolo totale:", e)
 
@@ -652,8 +656,8 @@ while index_data < length:
         plt.pause(0.01)
 
 #END OF WHILE CYCLE. Plot eventually remaining data
-print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", Tot_Iqr)
-print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", Tot_med)
+print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
+print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
 print("END")
 plotupdate()
 plt.show()
