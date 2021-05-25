@@ -903,9 +903,9 @@ fBirq_Tot = stats.iqr(fB_Tot)
 TiTeirq_Tot = stats.iqr(TiTe_Tot)
 duty_irq_Tot = stats.iqr([float(Ti_Tot/T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
 #
-Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot,  fdev]
-print(Tot_med)
+Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
 Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-print(Tot_Iqr)
+print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
+print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
 plt.show()
 #

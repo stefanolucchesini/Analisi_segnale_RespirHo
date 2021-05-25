@@ -1,12 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
 filename = 'Stefano_L_A_new.txt'
-window_size = 80  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+#A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
+window_size = 100  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
-#fdev = (len(data) / 3) / 300
-fdev = 6.5
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -176,7 +175,9 @@ def plotupdate():
 data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
 data = data.reset_index(drop=True)  # reset the indexes order
-
+fdev = (len(data) / 3) / 300
+#fdev = 10
+print("fdev:", fdev)
 # GLOBAL VARIABLES INITIALIZATION
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
@@ -205,8 +206,10 @@ index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
 
 index_data = 3 * start  # global index for total data
+print("Skipping ", start, "data points")
 length = len(data)
 print("Il dataset ha", length, "campioni")
+
 #  PARTE ITERATIVA DEL CODICE
 while index_data < length:
     #print("GLOBAL INDEX:", index_data)
@@ -642,7 +645,7 @@ while index_data < length:
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-
+                    print("index_window", index_window)
                     print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
                     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
                 except Exception as e:
