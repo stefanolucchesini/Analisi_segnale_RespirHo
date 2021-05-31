@@ -1,10 +1,10 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_C_new.txt'
+filename = 'Stefano_L_O_new.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 100  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+start = 300  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
@@ -319,7 +319,7 @@ while index_data < length:
             abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
             #CLASSIFICATION
-            input = pd.DataFrame(Ref_pose)
+            input = pd.DataFrame(ref_array)
             N_TIME_STEPS = 200
             N_FEATURES = 4
             step = 20
@@ -334,7 +334,7 @@ while index_data < length:
                 X = np.asarray(segments).reshape(-1, N_TIME_STEPS, N_FEATURES)
                 y_pred = test_model.predict(X, steps=1, verbose=0)
                 rounded_y_pred = np.argmax(y_pred, axis=-1)
-                print("raw:", rounded_y_pred)
+                print("raw (last element):", rounded_y_pred[-1])
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
