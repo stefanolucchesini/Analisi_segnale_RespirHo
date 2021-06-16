@@ -210,7 +210,7 @@ print("Skipping ", start, "data points")
 length = len(data)
 print("Il dataset ha", length, "campioni")
 from keras.models import load_model
-test_model = load_model(r'C:\Users\stefano\Desktop\Analisi del segnale\Classificatore\complete_GRU.h5')
+test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
 labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
           'sitting', 'running', 'standing', 'supine', 'walking']
 
