@@ -1,11 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Stefano_L_O_new.txt'
+filename = 'indossato.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 100  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 200  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 300  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-incr = 50  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+incr = 180  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -28,6 +28,7 @@ import scipy.signal
 from sklearn.decomposition import PCA
 import scipy.stats as stats
 import warnings
+import time
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -162,22 +163,25 @@ def plotupdate():
         plt.figure(3)
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
-        plt.plot(tor['B'], color='red')
+        plt.plot(tor['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
         plt.subplot(3, 1, 2)
         plt.title('Battery voltage of device 2')
-        plt.plot(abd['B'], color='red')
+        plt.plot(abd['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
         plt.subplot(3, 1, 3)
         plt.title('Battery voltage of device 3')
-        plt.plot(ref['B'], color='red')
+        plt.plot(ref['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
     return
 
 
 data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
-data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4']
+data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'UNIX_time']
 data = data.reset_index(drop=True)  # reset the indexes order
+
+print("L'acquisizione è partita il", time.strftime("%D %H:%M:%S", time.localtime(int(data.iloc[1, -1]))))
+
 fdev = (len(data) / 3) / 300
 #fdev = 10
-print("fdev:", fdev)
+print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
@@ -209,10 +213,10 @@ index_data = 3 * start  # global index for total data
 print("Skipping ", start, "data points")
 length = len(data)
 print("Il dataset ha", length, "campioni")
-from keras.models import load_model
-test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
-labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
-          'sitting', 'running', 'standing', 'supine', 'walking']
+#from keras.models import load_model
+#test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
+#labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
+#         'sitting', 'running', 'standing', 'supine', 'walking']
 
 #  PARTE ITERATIVA DEL CODICE
 while index_data < length:
@@ -319,6 +323,7 @@ while index_data < length:
             abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
             #CLASSIFICATION
+            '''
             input = pd.DataFrame(ref_array)
             N_TIME_STEPS = 200
             N_FEATURES = 4
@@ -338,7 +343,7 @@ while index_data < length:
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
-
+            '''
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
                 tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
