@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'timestamp.txt'
+filename = 'letto1h.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 200  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -345,31 +345,33 @@ while index_data < length:
                 print("Prediction error:", e)
             '''
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
-                # THORAX QUATERNION COMPUTATION
-                tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
-                Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
-                tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
-                tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-                # ABDOMEN QUATERNION COMPUTATION
-                abd_quat = Quaternion(abd_array[i])
-                Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
-                abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
-                abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
-                # REFERENCE QUATERNION COMPUTATION
-                ref_quat = Quaternion(ref_array[i])
-                Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
-                ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
-                ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
-                # THORAX COMPONENT
-                Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
-                Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
-                t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
-                # ABDOMEN COMPONENT
-                Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
-                a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
-
+                try:
+                    # THORAX QUATERNION COMPUTATION
+                    tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
+                    Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
+                    tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
+                    tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
+                    # ABDOMEN QUATERNION COMPUTATION
+                    abd_quat = Quaternion(abd_array[i])
+                    Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
+                    abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
+                    abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
+                    # REFERENCE QUATERNION COMPUTATION
+                    ref_quat = Quaternion(ref_array[i])
+                    Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
+                    ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+                    ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
+                    # THORAX COMPONENT
+                    Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
+                    Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
+                    t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                    t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+                    # ABDOMEN COMPONENT
+                    Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
+                    a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                    a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
+                except Exception as e:
+                    print("errore calcolo interno finestra:", e)
             # fine del calcolo dentro la finestra
             interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size,
                                                                                min_periods=math.floor(window_size / 2),
