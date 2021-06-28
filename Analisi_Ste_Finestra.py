@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'indossato.txt'
+filename = 'timestamp.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 200  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -174,13 +174,13 @@ def plotupdate():
 
 
 data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
-data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'UNIX_time']
+print(data)
+data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec']
 data = data.reset_index(drop=True)  # reset the indexes order
+print(data)
+print("L'acquisizione è partita il\n", data.iloc[0, -6:])
 
-print("L'acquisizione è partita il", time.strftime("%D %H:%M:%S", time.localtime(int(data.iloc[1, -1]))))
-
-fdev = (len(data) / 3) / 300
-#fdev = 10
+fdev = 10
 print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
