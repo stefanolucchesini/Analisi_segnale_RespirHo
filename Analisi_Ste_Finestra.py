@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'letto1h.txt'
+filename = 'test18respiri.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 200  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -28,7 +28,7 @@ import scipy.signal
 from sklearn.decomposition import PCA
 import scipy.stats as stats
 import warnings
-import time
+
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -177,7 +177,7 @@ data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
 print(data)
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec']
 data = data.reset_index(drop=True)  # reset the indexes order
-print(data)
+#print(data)
 print("L'acquisizione è partita il\n", data.iloc[0, -6:])
 
 fdev = 10
@@ -226,7 +226,7 @@ while index_data < length:
     data.iloc[index_data] = data.iloc[index_data].str.replace('[', '')
     data.iloc[index_data] = data.iloc[index_data].str.replace(']', '')
     data.iloc[index_data, 1:8] = data.iloc[index_data, 1:8].apply(int,
-                                                                  base=16)  # convert to base 10 everything but DevID
+                                                                  base=16)  # convert to base 10 everything but DevID and timestamp
 
     # Mette NAN ai quaternioni se il pacchetto è invalido
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
@@ -240,7 +240,7 @@ while index_data < length:
         # mette il dato nel dataframe del terzo device
         ref = ref.append(data.iloc[index_data])
         ref = ref.reset_index(drop=True)
-        ref = ref.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
+        ref = ref.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery, timestamp and quaternions data
         ref = ref.astype(float)
         # conversion of quaternions in range [-1:1]
         quatsconv(3, index_ref)  # device 3 conversion
@@ -251,7 +251,7 @@ while index_data < length:
         # mette il dato nel dataframe del terzo device
         abd = abd.append(data.iloc[index_data])
         abd = abd.reset_index(drop=True)
-        abd = abd.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
+        abd = abd.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery, timestamp and quaternions data
         abd = abd.astype(float)
         # conversion of quaternions in range [-1:1]
         quatsconv(2, index_abd)  # device 1 conversion
@@ -263,7 +263,7 @@ while index_data < length:
         # mette il dato nel dataframe del terzo device
         tor = tor.append(data.iloc[index_data])
         tor = tor.reset_index(drop=True)
-        tor = tor.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery and quaternions data
+        tor = tor.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery, timestamp and quaternions data
         tor = tor.astype(float)
         # conversion of quaternions in range [-1:1]
         quatsconv(1, index_tor)  # device 1 conversion
@@ -317,7 +317,7 @@ while index_data < length:
                 Tor_pose.append(tor_pose_w)
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
-            # takes the 4 quaternions, excludes battery voltage
+            # takes the 4 quaternions, excludes battery voltage and timestamps
             tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
@@ -412,6 +412,7 @@ while index_data < length:
                 fStimMean_T = statistics.mean(fStimVec_T)
                 fStimstd_T = statistics.stdev(fStimVec_T)
                 lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
+                #print("lowThreshold_T", lowThreshold_T)
                 f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
                                                 nfft=window_size,
                                                 detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
@@ -430,6 +431,7 @@ while index_data < length:
                 fStimMean_A = statistics.mean(fStimVec_A)
                 fStimstd_A = statistics.stdev(fStimVec_A)
                 lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
+                #print("lowThreshold_A", lowThreshold_A)
                 f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
                                                 nfft=window_size,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
@@ -542,23 +544,27 @@ while index_data < length:
                     T_A.append(ttot)
                     fB_A.append(fb)
                 try:
-                    Tmean_A = statistics.mean(T_A)
-                    Timean_A = statistics.mean(Ti_A)
-                    Temean_A = statistics.mean(Te_A)
-                    fBmean_A = statistics.mean(fB_A)
+                    Tmedian_A = statistics.median(T_A)
+                    Timedian_A = statistics.median(Ti_A)
+                    Temedian_A = statistics.median(Te_A)
+                    fBmedian_A = statistics.median(fB_A)
                     fBspectrum_A = fBspectrum_A * 60
-                    TiTemean_A = statistics.mean(TiTe_A)
-                    duty_mean_A = statistics.mean([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                    TiTemedian_A = statistics.median(TiTe_A)
+                    duty_median_A = statistics.median([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                     Tstd_A = statistics.stdev(T_A)
                     Tistd_A = statistics.stdev(Ti_A)
                     Testd_A = statistics.stdev(Te_A)
                     fBstd_A = statistics.stdev(fB_A)
                     TiTestd_A = statistics.stdev(TiTe_A)
                     duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                    PCA_A = [fBmean_A, Timean_A, Temean_A, TiTemean_A, duty_mean_A]
+                    PCA_A = [fBmedian_A, Timedian_A, Temedian_A, duty_median_A]
                     SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
+                    print("index_window", index_window)
+                    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A])
+                    print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+
                 except Exception as e:
-                    print("Errore calcolo abd:", e)
+                    print("Errore calcolo parametri abd:", e)
                 # RESPIRATORY PARAMETERS THORAX
                 T_T = []
                 Ti_T = []
@@ -577,23 +583,25 @@ while index_data < length:
                     T_T.append(ttot)
                     fB_T.append(fb)
                 try:
-                    Tmean_T = statistics.mean(T_T)
-                    Timean_T = statistics.mean(Ti_T)
-                    Temean_T = statistics.mean(Te_T)
-                    fBmean_T = statistics.mean(fB_T)
+                    Tmedian_T = statistics.median(T_T)
+                    Timedian_T = statistics.median(Ti_T)
+                    Temedian_T = statistics.median(Te_T)
+                    fBmedian_T = statistics.median(fB_T)
                     fBspectrum_T = fBspectrum_T * 60
-                    TiTemean_T = statistics.mean(TiTe_T)
-                    duty_mean_T = statistics.mean([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                    Tstd_T = statistics.stdev(T_T)
-                    Tistd_T = statistics.stdev(Ti_T)
-                    Testd_T = statistics.stdev(Te_T)
-                    fBstd_T = statistics.stdev(fB_T)
-                    TiTestd_T = statistics.stdev(TiTe_T)
-                    duty_std_T = statistics.stdev([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                    PCA_T = [fBmean_T, Timean_T, Temean_T, TiTemean_T, duty_mean_T]
+                    TiTemedian_T = statistics.median(TiTe_T)
+                    duty_median_T = statistics.median([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                    Tstd_T = stats.iqr(T_T)
+                    Tistd_T = stats.iqr(Ti_T)
+                    Testd_T = stats.iqr(Te_T)
+                    fBstd_T = stats.iqr(fB_T)
+                    TiTestd_T = stats.iqr(TiTe_T)
+                    duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                    PCA_T = [fBmedian_T, Timedian_T, Temedian_T, duty_median_T]
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T])
+                    print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
                 except Exception as e:
-                    print("Errore calcolo tor:", e)
+                    print("Errore calcolo parametri tor:", e)
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
                 f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
@@ -649,15 +657,6 @@ while index_data < length:
                     VTe_Tot.append(vte)
                     VT_Tot.append(vt)
                 try:
-                    #MEDIA
-                    Tmean_Tot = statistics.mean(T_Tot)
-                    Timean_Tot = statistics.mean(Ti_Tot)
-                    Temean_Tot = statistics.mean(Te_Tot)
-                    fBmean_Tot = statistics.mean(fB_Tot)
-                    fBspectrum_Tot = fBspectrum_Tot * 60
-                    TiTemean_Tot = statistics.mean(TiTe_Tot)
-                    duty_mean_Tot = statistics.mean([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    PCA_Tot = [fBmean_Tot, Timean_Tot, Temean_Tot, TiTemean_Tot, duty_mean_Tot]
                     #MEDIANA
                     Tmed_Tot = statistics.median(T_Tot)
                     Timed_Tot = statistics.median(Ti_Tot)
@@ -676,11 +675,10 @@ while index_data < length:
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-                    print("index_window", index_window)
-                    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
-                    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
+                    print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med])
+                    print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
                 except Exception as e:
-                    print("Errore calcolo totale:", e)
+                    print("Errore calcolo parameteri totale:", e)
 
     index_data += 1  # global
     if flag == 1:
@@ -690,11 +688,18 @@ while index_data < length:
         plt.pause(0.01)
 
 #END OF WHILE CYCLE. Plot eventually remaining data
-print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
-print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
-print("END")
+try:
+    print("final index_window:", index_window)
+    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A])
+    print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T])
+    print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
+    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
+    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
+    print("END")
+except Exception as e:
+    print("Errore finale")
+
 plotupdate()
 plt.show()
-# data1.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_1after.csv', index=False, header=True)
-# data2.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_2after.csv', index=False, header=True)
-# data3.to_csv(r'C:\Users\Stefano\Desktop\Analisi del segnale\data_3after.csv', index=False, header=True)
+
