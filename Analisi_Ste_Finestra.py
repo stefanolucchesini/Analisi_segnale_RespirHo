@@ -1,11 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'test18respiri.txt'
+filename = '18-17-18-3min.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 200  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-incr = 180  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -174,7 +174,7 @@ def plotupdate():
 
 
 data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
-print(data)
+#print(data)
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec']
 data = data.reset_index(drop=True)  # reset the indexes order
 #print(data)
@@ -677,6 +677,7 @@ while index_data < length:
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
                     print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med])
                     print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
+                    print("--------------------------------------------------------------------------------------\n")
                 except Exception as e:
                     print("Errore calcolo parameteri totale:", e)
 
