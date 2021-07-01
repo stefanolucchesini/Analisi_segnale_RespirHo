@@ -5,13 +5,13 @@ filename = 'steletto.txt'
 window_size = 300  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 36000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-stop = 42000  # number of sample at which program execution will stop, 0 will run the whole txt file
+stop = 45000  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 150  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
-w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
+w1plot = 0  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency
-batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
+batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
 
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
@@ -105,10 +105,10 @@ def quatsconv(device, i):
 
 
 def plotupdate():
-    plt.clf()
     if w1plot:
         # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
         plt.figure(1)
+        plt.clf()
         plt.subplot(5, 1, 1)
         plt.title('Quaternions of device 1')
         plt.plot(tor['1'], color='red')
@@ -140,6 +140,7 @@ def plotupdate():
     if w2plot:
         # CREAZIONE FINESTRA 2: SEGNALE RESPIRATORIO E SPETTRO
         plt.figure(2)
+        plt.clf()
         plt.subplot(4, 1, 1)
         plt.title('Abdomen signal with (Max-Min) highlight')
         plt.plot(SmoothSmoothA)
@@ -163,25 +164,31 @@ def plotupdate():
             plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
             plt.title('Total Spectrum and maximum')
     if resp_param_plot:
+    # CREAZIONE FINESTRA 4: FREQUENZA RESPIRATORIA
         try:
             plt.figure(3)
+            plt.clf()
             plt.subplot(3, 1, 1)
             plt.plot(indexes, torfreqs, color='blue')
             plt.ylim(top=30, bottom=0)
-            plt.title('fresp given by tor')
+            plt.ylabel('Resp/min')
+            plt.title('fresp from tor')
             plt.subplot(3, 1, 2)
             plt.plot(indexes, abdfreqs, color='blue')
             plt.ylim(top=30, bottom=0)
-            plt.title('fresp given by abd')
+            plt.ylabel('Resp/min')
+            plt.title('fresp from abd')
             plt.subplot(3, 1, 3)
             plt.plot(indexes, totfreqs, color='blue')
             plt.ylim(top=30, bottom=0)
             plt.title('total fresp')
+            plt.ylabel('Resp/min')
         except Exception as e:
             print("Resp param plotting error:", e)
     if batteryplot:
         # CREAZIONE FINESTRA 4: TENSIONE BATTERIE
         plt.figure(4)
+        plt.clf()
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
         plt.plot(tor['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
@@ -204,20 +211,23 @@ data = data.reset_index(drop=True)  # reset the indexes order
 #print(data)
 print("Analizzo i dati a partire dal campione acquisito il giorno")
 print(data.iloc[3*start, -6], "\\", data.iloc[3*start, -5], "alle", data.iloc[3*start, -4], ":", data.iloc[3*start, -3], ":", data.iloc[3*start, -2], ":", data.iloc[3*start, -1])
-
+print("fino al campione acquisito il giorno")
+print(data.iloc[3*stop, -6], "\\", data.iloc[3*stop, -5], "alle", data.iloc[3*stop, -4], ":", data.iloc[3*stop, -3], ":", data.iloc[3*stop, -2], ":", data.iloc[3*stop, -1])
 fdev = 10
 print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
 tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
 ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
+index_tor, index_abd, index_ref = 0, 0, 0  # indici per dataframe dei device
+index_tor_old, index_abd_old, index_ref_old = 0, 0, 0  # indici all'iterazione precedente
 tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
 ref_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
 abd_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
-t1 = pd.DataFrame(columns=['1', '2', '3', '4'])
+t1 = pd.DataFrame(columns=['1', '2', '3', '4'])  # segnale toracico da filtrare
 a1 = pd.DataFrame(columns=['1', '2', '3', '4'])
 pca = PCA(n_components=1)
-tor_quat, Tor_pose_quat = Quaternion(), Quaternion()
+tor_quat, Tor_pose_quat = Quaternion(), Quaternion()   #quaternioni
 ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
 abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
 FuseT_1, FuseA_1 = [], []
@@ -227,11 +237,9 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
-abdfreqs, torfreqs, totfreqs, indexes = [], [], [], []
-Min_Ind_Tot, Minima_Tot = [], [] #for plotting
-count = 0
-index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
-index_tor_old, index_abd_old, index_ref_old = 0, 0, 0
+abdfreqs, torfreqs, totfreqs, indexes = [], [], [], []  #per plot frequenza respiratoria
+Min_Ind_Tot, Minima_Tot = [], []  #for plotting
+
 index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
 
@@ -247,7 +255,7 @@ print("Skipping ", start, "data points")
 #         'sitting', 'running', 'standing', 'supine', 'walking']
 
 #  PARTE ITERATIVA DEL CODICE
-while index_data < ncycles:
+while index_data <= ncycles:
     #print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index_data] = data.iloc[index_data].astype(str)
@@ -340,8 +348,9 @@ while index_data < ncycles:
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                           statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-            Tor_pose, Ref_pose, Abd_pose = [], [], []
-            while len(Tor_pose) < len(tor):  # len(tor)=len(abd)=len(ref)!
+            if index_window == 0:
+                Tor_pose, Ref_pose, Abd_pose = [], [], []
+            while len(Tor_pose) <= max(len(tor), len(abd), len(ref)):
                 Tor_pose.append(tor_pose_w)
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
@@ -373,33 +382,31 @@ while index_data < ncycles:
                 print("Prediction error:", e)
             '''
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
-                try:
-                    # THORAX QUATERNION COMPUTATION
-                    tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
-                    Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
-                    tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
-                    tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-                    # ABDOMEN QUATERNION COMPUTATION
-                    abd_quat = Quaternion(abd_array[i])
-                    Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
-                    abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
-                    abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
-                    # REFERENCE QUATERNION COMPUTATION
-                    ref_quat = Quaternion(ref_array[i])
-                    Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
-                    ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
-                    ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
-                    # THORAX COMPONENT
-                    Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
-                    Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
-                    t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                    t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
-                    # ABDOMEN COMPONENT
-                    Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
-                    a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                    a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
-                except Exception as e:
-                    print("errore calcolo interno finestra:", e)
+                # THORAX QUATERNION COMPUTATION
+                tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
+                Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
+                tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
+                tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
+                # ABDOMEN QUATERNION COMPUTATION
+                abd_quat = Quaternion(abd_array[i])
+                Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
+                abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
+                abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
+                # REFERENCE QUATERNION COMPUTATION
+                ref_quat = Quaternion(ref_array[i])
+                Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
+                ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+                ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
+                # THORAX COMPONENT
+                Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
+                Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
+                t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+                # ABDOMEN COMPONENT
+                Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
+                a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
+
             # fine del calcolo dentro la finestra
             interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size,
                                                                                min_periods=math.floor(window_size / 2),
@@ -431,8 +438,7 @@ while index_data < ncycles:
             Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
             Index_T = Index_T[0]  # ‘peak_heights’ selection
             fStimVec_T = []
-            if len(Index_T) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
-                # print("len index_T", len(Index_T))
+            if len(Index_T) >= 2:  # at least 2 peaks are needed to compute the intrapeak distance
                 for i in range(len(Index_T) - 1):
                     intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                     fstim = 1 / intrapeak
@@ -463,7 +469,7 @@ while index_data < ncycles:
                 f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
                                                 nfft=window_size,
                                                 detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
-            if len(Index_A) > 2 and len(Index_T) > 2:  # the two thresholds are surely defined
+            if len(Index_A) >= 2 and len(Index_T) >= 2:  # the two thresholds are surely defined
                 lowThreshold = min(lowThreshold_A,
                                    lowThreshold_T)  # the low threshold is computed as the minimum between the thoracic and the abdominal one
                 # ABDOMEN MAXIMA AND MINIMA DETECTION
