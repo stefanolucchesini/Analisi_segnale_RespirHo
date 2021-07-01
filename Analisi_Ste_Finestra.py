@@ -10,7 +10,9 @@ incr = 150  # Overlapping between a window and the following. 1=max overlap. MUS
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
-batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
+resp_param_plot = 1  # 1 enables plotting respiratory frequency
+batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
+
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
 walking_f_threshold_max = 1  # 0.75
@@ -32,6 +34,7 @@ import warnings
 
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
 
 
 def quatsconv(device, i):
@@ -159,18 +162,38 @@ def plotupdate():
             plt.ylabel('Magnitude')
             plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
             plt.title('Total Spectrum and maximum')
+    if resp_param_plot:
+        try:
+            plt.figure(3)
+            plt.subplot(3, 1, 1)
+            plt.plot(indexes, torfreqs, color='blue')
+            plt.ylim(top=30, bottom=0)
+            plt.title('fresp given by tor')
+            plt.subplot(3, 1, 2)
+            plt.plot(indexes, abdfreqs, color='blue')
+            plt.ylim(top=30, bottom=0)
+            plt.title('fresp given by abd')
+            plt.subplot(3, 1, 3)
+            plt.plot(indexes, totfreqs, color='blue')
+            plt.ylim(top=30, bottom=0)
+            plt.title('total fresp')
+        except Exception as e:
+            print("Resp param plotting error:", e)
     if batteryplot:
-        # CREAZIONE FINESTRA 3: TENSIONE BATTERIE
-        plt.figure(3)
+        # CREAZIONE FINESTRA 4: TENSIONE BATTERIE
+        plt.figure(4)
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
         plt.plot(tor['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
         plt.subplot(3, 1, 2)
         plt.title('Battery voltage of device 2')
         plt.plot(abd['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
         plt.subplot(3, 1, 3)
         plt.title('Battery voltage of device 3')
         plt.plot(ref['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
     return
 
 
@@ -204,6 +227,7 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
+abdfreqs, torfreqs, totfreqs, indexes = [], [], [], []
 Min_Ind_Tot, Minima_Tot = [], [] #for plotting
 count = 0
 index_tor, index_abd, index_ref = 0, 0, 0  # indexes for devices
@@ -562,6 +586,8 @@ while index_data < ncycles:
                     TiTestd_A = statistics.stdev(TiTe_A)
                     duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                     PCA_A = [fBmedian_A, Timedian_A, Temedian_A, duty_median_A]
+                    abdfreqs.append(PCA_A[0])
+                    indexes.append(index_window)
                     SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
                     print("index_window", index_window)
                     print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A])
@@ -602,6 +628,7 @@ while index_data < ncycles:
                     duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                     PCA_T = [fBmedian_T, Timedian_T, Temedian_T, duty_median_T]
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                    torfreqs.append(PCA_T[0])
                     print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T])
                     print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
                 except Exception as e:
@@ -679,6 +706,7 @@ while index_data < ncycles:
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
+                    totfreqs.append(Tot_med[0])
                     print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med])
                     print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
                     print("--------------------------------------------------------------------------------------\n")
@@ -703,7 +731,7 @@ try:
     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
     print("END")
 except Exception as e:
-    print("Errore finale")
+    print("Errore finale", e)
 
 plotupdate()
 plt.show()
