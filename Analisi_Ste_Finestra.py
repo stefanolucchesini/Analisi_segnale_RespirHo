@@ -1,11 +1,12 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '18-17-18-3min.txt'
+filename = 'steletto.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 300  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+start = 36000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+stop = 42000  # number of sample at which program execution will stop, 0 will run the whole txt file
+incr = 150  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -178,7 +179,8 @@ data = pd.read_csv(filename, sep=",|:", header=None, engine='python')
 data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec']
 data = data.reset_index(drop=True)  # reset the indexes order
 #print(data)
-print("L'acquisizione è partita il\n", data.iloc[0, -6:])
+print("Analizzo i dati a partire dal campione acquisito il giorno")
+print(data.iloc[3*start, -6], "\\", data.iloc[3*start, -5], "alle", data.iloc[3*start, -4], ":", data.iloc[3*start, -3], ":", data.iloc[3*start, -2], ":", data.iloc[3*start, -1])
 
 fdev = 10
 print("fdev:", round(fdev, 2), "Hz")
@@ -210,16 +212,18 @@ index_window = 0  # for computing things inside the window
 flag = 0  # used for plotting after first window is available
 
 index_data = 3 * start  # global index for total data
-print("Skipping ", start, "data points")
 length = len(data)
+ncycles = length if stop == 0 else 3*stop
 print("Il dataset ha", length, "campioni")
+print("Skipping ", start, "data points")
+
 #from keras.models import load_model
 #test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
 #labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
 #         'sitting', 'running', 'standing', 'supine', 'walking']
 
 #  PARTE ITERATIVA DEL CODICE
-while index_data < length:
+while index_data < ncycles:
     #print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index_data] = data.iloc[index_data].astype(str)

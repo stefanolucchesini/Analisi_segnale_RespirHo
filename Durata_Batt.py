@@ -3,14 +3,11 @@ globals().clear()
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# import numpy as np
-
 # RELAZIONE TRA TENSIONE BATTERIA E VALORE LETTO DALL'ADC:
 # Vbatt = 1881/69280 * ADC
 param = 1881 / 69280
 window_size = 50
-
-data = pd.read_csv('durata_parte1.txt', sep=' ', header=None, engine='python')
+data = pd.read_csv('durata_battparte1.txt', sep=' ', header=None, engine='python')
 data = pd.DataFrame(data)
 data.columns = ['nans', 'seconds', 'ADC']
 data = data.drop(['nans'], axis=1)
