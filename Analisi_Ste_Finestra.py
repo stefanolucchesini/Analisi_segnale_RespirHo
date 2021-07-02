@@ -1,14 +1,14 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'steletto.txt'
+filename = '18rfinti.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 300  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 36000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-stop = 45000  # number of sample at which program execution will stop, 0 will run the whole txt file
-incr = 150  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
+incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
-w1plot = 0  # 1 enables plotting quaternions and PCA, 0 disables it
+w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency
 batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
@@ -168,21 +168,21 @@ def plotupdate():
         try:
             plt.figure(3)
             plt.clf()
-            plt.subplot(3, 1, 1)
-            plt.plot(indexes, torfreqs, color='blue')
-            plt.ylim(top=30, bottom=0)
+            plt.subplot(4, 1, 1)
+            plt.plot(indexes, [PCA_T[x][0] for x in range(len(indexes))], color='blue')
             plt.ylabel('Resp/min')
             plt.title('fresp from tor')
-            plt.subplot(3, 1, 2)
-            plt.plot(indexes, abdfreqs, color='blue')
-            plt.ylim(top=30, bottom=0)
+            plt.subplot(4, 1, 2)
+            plt.plot(indexes, [PCA_A[x][0] for x in range(len(indexes))], color='blue')
             plt.ylabel('Resp/min')
             plt.title('fresp from abd')
-            plt.subplot(3, 1, 3)
-            plt.plot(indexes, totfreqs, color='blue')
-            plt.ylim(top=30, bottom=0)
+            plt.subplot(4, 1, 3)
+            plt.plot(indexes, [Tot_med[x][0] for x in range(len(indexes))], color='blue')
             plt.title('total fresp')
             plt.ylabel('Resp/min')
+            plt.subplot(4, 1, 4)
+            plt.plot(indexes, [min(PCA_T[x][3], PCA_A[x][3], Tot_med[x][3]) for x in range(len(indexes))], color='red')
+            plt.title('duty cycle')
         except Exception as e:
             print("Resp param plotting error:", e)
     if batteryplot:
@@ -212,7 +212,13 @@ data = data.reset_index(drop=True)  # reset the indexes order
 print("Analizzo i dati a partire dal campione acquisito il giorno")
 print(data.iloc[3*start, -6], "\\", data.iloc[3*start, -5], "alle", data.iloc[3*start, -4], ":", data.iloc[3*start, -3], ":", data.iloc[3*start, -2], ":", data.iloc[3*start, -1])
 print("fino al campione acquisito il giorno")
-print(data.iloc[3*stop, -6], "\\", data.iloc[3*stop, -5], "alle", data.iloc[3*stop, -4], ":", data.iloc[3*stop, -3], ":", data.iloc[3*stop, -2], ":", data.iloc[3*stop, -1])
+if stop != 0:
+    print(data.iloc[3*stop, -6], "\\", data.iloc[3*stop, -5], "alle", data.iloc[3*stop, -4], ":",
+          data.iloc[3*stop, -3], ":", data.iloc[3*stop, -2], ":", data.iloc[3*stop, -1])
+else:
+    print(data.iloc[-1, -6], "\\", data.iloc[-1, -5], "alle", data.iloc[-1, -4], ":",
+          data.iloc[-1, -3], ":", data.iloc[-1, -2], ":", data.iloc[-1, -1])
+
 fdev = 10
 print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
@@ -237,7 +243,7 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
-abdfreqs, torfreqs, totfreqs, indexes = [], [], [], []  #per plot frequenza respiratoria
+PCA_A, PCA_T, Tot_med, indexes = [], [], [], []  #per plot parametri respiratori
 Min_Ind_Tot, Minima_Tot = [], []  #for plotting
 
 index_window = 0  # for computing things inside the window
@@ -255,7 +261,7 @@ print("Skipping ", start, "data points")
 #         'sitting', 'running', 'standing', 'supine', 'walking']
 
 #  PARTE ITERATIVA DEL CODICE
-while index_data <= ncycles:
+while index_data < ncycles:
     #print("GLOBAL INDEX:", index_data)
     # transforming into string in order to remove [ and ] from the file\
     data.iloc[index_data] = data.iloc[index_data].astype(str)
@@ -591,12 +597,11 @@ while index_data <= ncycles:
                     fBstd_A = statistics.stdev(fB_A)
                     TiTestd_A = statistics.stdev(TiTe_A)
                     duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                    PCA_A = [fBmedian_A, Timedian_A, Temedian_A, duty_median_A]
-                    abdfreqs.append(PCA_A[0])
+                    PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
                     indexes.append(index_window)
                     SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
                     print("index_window", index_window)
-                    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A])
+                    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
                     print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
 
                 except Exception as e:
@@ -632,10 +637,9 @@ while index_data <= ncycles:
                     fBstd_T = stats.iqr(fB_T)
                     TiTestd_T = stats.iqr(TiTe_T)
                     duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                    PCA_T = [fBmedian_T, Timedian_T, Temedian_T, duty_median_T]
+                    PCA_T.append([fBmedian_T, Timedian_T, Temedian_T, duty_median_T])
                     SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
-                    torfreqs.append(PCA_T[0])
-                    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T])
+                    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
                     print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
                 except Exception as e:
                     print("Errore calcolo parametri tor:", e)
@@ -710,10 +714,9 @@ while index_data <= ncycles:
                     fBirq_Tot = stats.iqr(fB_Tot)
                     TiTeirq_Tot = stats.iqr(TiTe_Tot)
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    Tot_med = [fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot]
+                    Tot_med.append([fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot])
                     Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
-                    totfreqs.append(Tot_med[0])
-                    print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med])
+                    print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
                     print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
                     print("--------------------------------------------------------------------------------------\n")
                 except Exception as e:
@@ -729,15 +732,21 @@ while index_data <= ncycles:
 #END OF WHILE CYCLE. Plot eventually remaining data
 try:
     print("final index_window:", index_window)
-    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A])
+    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
     print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
-    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T])
+    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
     print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
-    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med])
+    print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med[-1]])
     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
-    print("END")
 except Exception as e:
     print("Errore finale", e)
+
+#EXPORT ELABORATED DATA TO CSV FILE
+df = pd.DataFrame(Tot_med, columns=["fB_median_Tot", "Ti_median_Tot", "Te_median_Tot", "duty_median_Tot"])
+df['indexes'] = indexes
+df = df.set_index('indexes')
+df.to_csv('total_params_out.csv')
+print("END")
 
 plotupdate()
 plt.show()
