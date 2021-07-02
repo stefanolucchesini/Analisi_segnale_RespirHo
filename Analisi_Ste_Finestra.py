@@ -1,12 +1,12 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '18rfinti.txt'
+filename = '18-17-18-3min.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 300  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
-incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+incr = 150  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -182,7 +182,7 @@ def plotupdate():
             plt.ylabel('Resp/min')
             plt.subplot(4, 1, 4)
             plt.plot(indexes, [min(PCA_T[x][3], PCA_A[x][3], Tot_med[x][3]) for x in range(len(indexes))], color='red')
-            plt.title('duty cycle')
+            plt.title('min duty cycle')
         except Exception as e:
             print("Resp param plotting error:", e)
     if batteryplot:
@@ -210,7 +210,8 @@ data.columns = ['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4', 'day', 'month
 data = data.reset_index(drop=True)  # reset the indexes order
 #print(data)
 print("Analizzo i dati a partire dal campione acquisito il giorno")
-print(data.iloc[3*start, -6], "\\", data.iloc[3*start, -5], "alle", data.iloc[3*start, -4], ":", data.iloc[3*start, -3], ":", data.iloc[3*start, -2], ":", data.iloc[3*start, -1])
+print(data.iloc[3*start, -6], "\\", data.iloc[3*start, -5], "alle", data.iloc[3*start, -4], ":",
+      data.iloc[3*start, -3], ":", data.iloc[3*start, -2], ":", data.iloc[3*start, -1])
 print("fino al campione acquisito il giorno")
 if stop != 0:
     print(data.iloc[3*stop, -6], "\\", data.iloc[3*stop, -5], "alle", data.iloc[3*stop, -4], ":",
@@ -243,7 +244,7 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
-PCA_A, PCA_T, Tot_med, indexes = [], [], [], []  #per plot parametri respiratori
+PCA_A, PCA_T, Tot_med, Tot_Iqr, indexes, predictions = [], [], [], [], [], []  #per plot parametri respiratori
 Min_Ind_Tot, Minima_Tot = [], []  #for plotting
 
 index_window = 0  # for computing things inside the window
@@ -255,10 +256,10 @@ ncycles = length if stop == 0 else 3*stop
 print("Il dataset ha", length, "campioni")
 print("Skipping ", start, "data points")
 
-#from keras.models import load_model
-#test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
-#labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
-#         'sitting', 'running', 'standing', 'supine', 'walking']
+from keras.models import load_model
+test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
+labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
+         'sitting', 'running', 'standing', 'supine', 'walking']
 
 #  PARTE ITERATIVA DEL CODICE
 while index_data < ncycles:
@@ -366,7 +367,6 @@ while index_data < ncycles:
             abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
             #CLASSIFICATION
-            '''
             input = pd.DataFrame(ref_array)
             N_TIME_STEPS = 200
             N_FEATURES = 4
@@ -386,7 +386,7 @@ while index_data < ncycles:
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
-            '''
+
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
                 tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
@@ -516,8 +516,7 @@ while index_data < ncycles:
                 Max_Ind_A = scipy.signal.find_peaks(SmoothSmoothA, distance=distance_A, prominence=thr_SSA)
                 Max_Ind_A = Max_Ind_A[0]
                 Maxima_A = SmoothSmoothA[Max_Ind_A]
-                Min_Ind_A = []
-                Minima_A = []
+                Min_Ind_A, Minima_A = [], []
                 for i in range(len(Max_Ind_A) - 1):
                     min_value = min(SmoothSmoothA[Max_Ind_A[i]:Max_Ind_A[i + 1]])
                     Minima_A.append(min_value)
@@ -559,26 +558,20 @@ while index_data < ncycles:
                 Max_Ind_T = scipy.signal.find_peaks(SmoothSmoothT, distance=distance_T, prominence=thr_SST)
                 Max_Ind_T = Max_Ind_T[0]
                 Maxima_T = SmoothSmoothT[Max_Ind_T]
-                Min_Ind_T = []
-                Minima_T = []
+                Min_Ind_T, Minima_T = [], []
                 for i in range(len(Max_Ind_T) - 1):
                     min_value = min(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]])
                     Minima_T.append(min_value)
                     min_index = np.argmin(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]]) + Max_Ind_T[i]
                     Min_Ind_T.append(min_index)
                 # RESPIRATORY PARAMETERS ABDOMEN
-                T_A = []
-                Ti_A = []
-                Te_A = []
-                TiTe_A = []
-                fB_A = []
+                T_A, Ti_A, Te_A, fB_A = [], [], [], []
                 for i in range(len(Min_Ind_A)):
                     te = (Min_Ind_A[i] - Max_Ind_A[i]) / fdev
                     ti = (Max_Ind_A[i + 1] - Min_Ind_A[i]) / fdev
                     Ti_A.append(ti)
                     Te_A.append(te)
                     ti_te = ti / te
-                    TiTe_A.append(ti / te)
                     ttot = ti + te
                     fb = 1 / ttot * 60
                     T_A.append(ttot)
@@ -589,17 +582,15 @@ while index_data < ncycles:
                     Temedian_A = statistics.median(Te_A)
                     fBmedian_A = statistics.median(fB_A)
                     fBspectrum_A = fBspectrum_A * 60
-                    TiTemedian_A = statistics.median(TiTe_A)
                     duty_median_A = statistics.median([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                     Tstd_A = statistics.stdev(T_A)
                     Tistd_A = statistics.stdev(Ti_A)
                     Testd_A = statistics.stdev(Te_A)
                     fBstd_A = statistics.stdev(fB_A)
-                    TiTestd_A = statistics.stdev(TiTe_A)
                     duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                     PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
                     indexes.append(index_window)
-                    SD_A = [fBstd_A, Tistd_A, Testd_A, TiTestd_A, duty_std_A]
+                    SD_A = [fBstd_A, Tistd_A, Testd_A, duty_std_A]
                     print("index_window", index_window)
                     print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
                     print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
@@ -607,18 +598,12 @@ while index_data < ncycles:
                 except Exception as e:
                     print("Errore calcolo parametri abd:", e)
                 # RESPIRATORY PARAMETERS THORAX
-                T_T = []
-                Ti_T = []
-                Te_T = []
-                TiTe_T = []
-                fB_T = []
+                T_T, Ti_T, Te_T, fB_T = [], [], [], []
                 for i in range(len(Min_Ind_T)):
                     te = (Min_Ind_T[i] - Max_Ind_T[i]) / fdev
                     ti = (Max_Ind_T[i + 1] - Min_Ind_T[i]) / fdev
                     Ti_T.append(ti)
                     Te_T.append(te)
-                    ti_te = ti / te
-                    TiTe_T.append(ti / te)
                     ttot = ti + te
                     fb = 1 / ttot * 60
                     T_T.append(ttot)
@@ -629,16 +614,14 @@ while index_data < ncycles:
                     Temedian_T = statistics.median(Te_T)
                     fBmedian_T = statistics.median(fB_T)
                     fBspectrum_T = fBspectrum_T * 60
-                    TiTemedian_T = statistics.median(TiTe_T)
                     duty_median_T = statistics.median([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                     Tstd_T = stats.iqr(T_T)
                     Tistd_T = stats.iqr(Ti_T)
                     Testd_T = stats.iqr(Te_T)
                     fBstd_T = stats.iqr(fB_T)
-                    TiTestd_T = stats.iqr(TiTe_T)
                     duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                     PCA_T.append([fBmedian_T, Timedian_T, Temedian_T, duty_median_T])
-                    SD_T = [fBstd_T, Tistd_T, Testd_T, TiTestd_T, duty_std_T]
+                    SD_T = [fBstd_T, Tistd_T, Testd_T, duty_std_T]
                     print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
                     print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
                 except Exception as e:
@@ -671,32 +654,23 @@ while index_data < ncycles:
                 Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
                 Max_Ind_Tot = Max_Ind_Tot[0]
                 Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
-                Min_Ind_Tot = []
-                Minima_Tot = []
+                Min_Ind_Tot, Minima_Tot = [], []
                 for i in range(len(Max_Ind_Tot) - 1):
                     min_value = min(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]])
                     Minima_Tot.append(min_value)
                     min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
                     Min_Ind_Tot.append(min_index)
                 # TOTAL RESPIRATORY PARAMS
-                T_Tot, Ti_Tot, Te_Tot, TiTe_Tot, fB_Tot, VTi_Tot, VTe_Tot, VT_Tot = [], [], [], [], [], [], [], []
+                T_Tot, Ti_Tot, Te_Tot, fB_Tot = [], [], [], []
                 for i in range(len(Min_Ind_Tot)):
                     te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
                     ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
-                    vti = SmoothSmoothTot[Max_Ind_Tot[i + 1]] - SmoothSmoothTot[Min_Ind_Tot[i]]
-                    vte = SmoothSmoothTot[Min_Ind_Tot[i]] - SmoothSmoothTot[Max_Ind_Tot[i]]
-                    vt = (vti + vte) / 2
                     Ti_Tot.append(ti)
                     Te_Tot.append(te)
-                    ti_te = ti / te
-                    TiTe_Tot.append(ti / te)
                     ttot = ti + te
                     fb = (1 / ttot) * 60
                     T_Tot.append(ttot)
                     fB_Tot.append(fb)
-                    VTi_Tot.append(vti)
-                    VTe_Tot.append(vte)
-                    VT_Tot.append(vt)
                 try:
                     #MEDIANA
                     Tmed_Tot = statistics.median(T_Tot)
@@ -704,20 +678,21 @@ while index_data < ncycles:
                     Temed_Tot = statistics.median(Te_Tot)
                     fBmed_Tot = statistics.median(fB_Tot)
                     fBspectrum_T = fBspectrum_T * 60
-                    TiTemed_Tot = statistics.median(TiTe_T)
                     duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    VT_med_Tot = statistics.median(VT_Tot)
                     #INTERQUARTILE
                     Tirq_Tot = stats.iqr(T_Tot)
                     Tiirq_Tot = stats.iqr(Ti_Tot)
                     Teirq_Tot = stats.iqr(Te_Tot)
                     fBirq_Tot = stats.iqr(fB_Tot)
-                    TiTeirq_Tot = stats.iqr(TiTe_Tot)
                     duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                     Tot_med.append([fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot])
-                    Tot_Iqr = [fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot]
+                    Tot_Iqr.append([fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot])
+                    try:
+                        predictions.append(labels[rounded_y_pred[-1]])
+                    except Exception as e:
+                        print(e)
                     print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
-                    print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr], "\n")
+                    print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]], "\n")
                     print("--------------------------------------------------------------------------------------\n")
                 except Exception as e:
                     print("Errore calcolo parameteri totale:", e)
@@ -737,15 +712,19 @@ try:
     print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
     print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
     print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med[-1]])
-    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr])
+    print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]])
 except Exception as e:
     print("Errore finale", e)
 
 #EXPORT ELABORATED DATA TO CSV FILE
-df = pd.DataFrame(Tot_med, columns=["fB_median_Tot", "Ti_median_Tot", "Te_median_Tot", "duty_median_Tot"])
-df['indexes'] = indexes
-df = df.set_index('indexes')
-df.to_csv('total_params_out.csv')
+dftot = pd.DataFrame(Tot_med, columns=["fB_median_Tot", "Ti_median_Tot", "Te_median_Tot", "duty_median_Tot"])
+dfa = pd.DataFrame(PCA_A, columns=["fBmedian_Abdomen", "Ti_median_Abdomen", "Te_median_Abdomen", "duty_median_Abdomen"])
+dft = pd.DataFrame(PCA_T, columns=["fB_median_Thorax", "Ti_median_Thorax", "Te_median_Thorax", "duty_median_Thorax"])
+tot = pd.concat([dft, dfa, dftot], axis=1)
+tot['index'] = indexes
+tot['activity'] = predictions
+tot = tot.set_index('index')
+tot.to_csv('total_params_out.csv')
 print("END")
 
 plotupdate()
