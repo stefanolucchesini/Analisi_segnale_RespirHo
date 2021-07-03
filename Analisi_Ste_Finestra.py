@@ -1,17 +1,17 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '18-17-18-3min.txt'
+filename = '3luglio.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+start = 80000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency
-batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
+batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
 
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
@@ -107,64 +107,70 @@ def quatsconv(device, i):
 def plotupdate():
     if w1plot:
         # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
-        plt.figure(1)
-        plt.clf()
-        plt.subplot(5, 1, 1)
-        plt.title('Quaternions of device 1')
-        plt.plot(tor['1'], color='red')
-        plt.plot(tor['2'], color='green')
-        plt.plot(tor['3'], color='skyblue')
-        plt.plot(tor['4'], color='orange')
-        plt.subplot(5, 1, 2)
-        plt.title('Quaternions of device 2')
-        plt.plot(abd['1'], color='red')
-        plt.plot(abd['2'], color='green')
-        plt.plot(abd['3'], color='skyblue')
-        plt.plot(abd['4'], color='orange')
-        plt.subplot(5, 1, 3)
-        plt.title('Quaternions of device 3')
-        plt.plot(ref['1'], color='red')
-        plt.plot(ref['2'], color='green')
-        plt.plot(ref['3'], color='skyblue')
-        plt.plot(ref['4'], color='orange')
-        plt.subplot(5, 1, 4)
-        plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
-        plt.plot(FuseA_1, color='gold')
-        plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
-        plt.plot(EstimSmoothA, color='red')
-        plt.subplot(5, 1, 5)
-        plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
-        plt.plot(FuseT_1, color='gold')
-        plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
-        plt.plot(EstimSmoothT, color='red')
+        try:
+            plt.figure(1)
+            plt.clf()
+            plt.subplot(5, 1, 1)
+            plt.title('Quaternions of device 1')
+            plt.plot(tor['1'], color='red')
+            plt.plot(tor['2'], color='green')
+            plt.plot(tor['3'], color='skyblue')
+            plt.plot(tor['4'], color='orange')
+            plt.subplot(5, 1, 2)
+            plt.title('Quaternions of device 2')
+            plt.plot(abd['1'], color='red')
+            plt.plot(abd['2'], color='green')
+            plt.plot(abd['3'], color='skyblue')
+            plt.plot(abd['4'], color='orange')
+            plt.subplot(5, 1, 3)
+            plt.title('Quaternions of device 3')
+            plt.plot(ref['1'], color='red')
+            plt.plot(ref['2'], color='green')
+            plt.plot(ref['3'], color='skyblue')
+            plt.plot(ref['4'], color='orange')
+            plt.subplot(5, 1, 4)
+            plt.title('1° PCA Ab comp + filtering&positive peaks highlighting')
+            plt.plot(FuseA_1, color='gold')
+            plt.plot(Index_A, EstimSmoothA[Index_A], linestyle='None', marker="*", label='max')
+            plt.plot(EstimSmoothA, color='red')
+            plt.subplot(5, 1, 5)
+            plt.title('1° PCA Thorax comp + filtering&positive peaks highlighting')
+            plt.plot(FuseT_1, color='gold')
+            plt.plot(Index_T, EstimSmoothT[Index_T], linestyle='None', marker="*", label='max')
+            plt.plot(EstimSmoothT, color='red')
+        except Exception as e:
+            print("figure 1 error:", e)
     if w2plot:
         # CREAZIONE FINESTRA 2: SEGNALE RESPIRATORIO E SPETTRO
-        plt.figure(2)
-        plt.clf()
-        plt.subplot(4, 1, 1)
-        plt.title('Abdomen signal with (Max-Min) highlight')
-        plt.plot(SmoothSmoothA)
-        plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
-        plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
-        plt.subplot(4, 1, 2)
-        plt.title('Thorax signal with (Max-Min) highlight')
-        plt.plot(SmoothSmoothT)
-        plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
-        plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
-        plt.subplot(4, 1, 3)
-        plt.title('Total with (Max-Min) highlight')
-        plt.plot(SmoothSmoothTot)
-        plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
-        plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
-        plt.subplot(4, 1, 4)
-        if index_window > 10:
-            plt.plot(f_Tot, pxx_Tot)
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Magnitude')
-            plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
-            plt.title('Total Spectrum and maximum')
+        try:
+            plt.figure(2)
+            plt.clf()
+            plt.subplot(4, 1, 1)
+            plt.title('Abdomen signal with (Max-Min) highlight')
+            plt.plot(SmoothSmoothA)
+            plt.plot(Max_Ind_A, Maxima_A, linestyle='None', marker='+')
+            plt.plot(Min_Ind_A, Minima_A, linestyle='None', marker='.')
+            plt.subplot(4, 1, 2)
+            plt.title('Thorax signal with (Max-Min) highlight')
+            plt.plot(SmoothSmoothT)
+            plt.plot(Max_Ind_T, Maxima_T, linestyle='None', marker='x')
+            plt.plot(Min_Ind_T, Minima_T, linestyle='None', marker='o')
+            plt.subplot(4, 1, 3)
+            plt.title('Total with (Max-Min) highlight')
+            plt.plot(SmoothSmoothTot)
+            plt.plot(Max_Ind_Tot, Maxima_Tot, linestyle='None', marker='*')
+            plt.plot(Min_Ind_Tot, Minima_Tot, linestyle='None', marker='.')
+            plt.subplot(4, 1, 4)
+            if index_window > 10:
+                plt.plot(f_Tot, pxx_Tot)
+                plt.xlabel('Frequency (Hz)')
+                plt.ylabel('Magnitude')
+                plt.plot(f_Tot[fBI_Tot + start_Tot], fBmax_Tot, marker='*')
+                plt.title('Total Spectrum and maximum')
+        except Exception as e:
+            print("figure 2 error:", e)
     if resp_param_plot:
-    # CREAZIONE FINESTRA 4: FREQUENZA RESPIRATORIA
+    # CREAZIONE FINESTRA 3: FREQUENZA RESPIRATORIA
         try:
             plt.figure(3)
             plt.clf()
@@ -184,7 +190,7 @@ def plotupdate():
             plt.plot(indexes, [min(PCA_T[x][3], PCA_A[x][3], Tot_med[x][3]) for x in range(len(indexes))], color='red')
             plt.title('min duty cycle')
         except Exception as e:
-            print("Resp param plotting error:", e)
+            print("figure 3 plotting error:", e)
     if batteryplot:
         # CREAZIONE FINESTRA 4: TENSIONE BATTERIE
         plt.figure(4)
@@ -357,11 +363,9 @@ while index_data < ncycles:
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
             # takes the 4 quaternions, excludes battery voltage and timestamps
-            tor_array.extend(tor.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
-            ref_array.extend(ref.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
-            abd_array.extend(abd.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
-            # print("ref", ref.head(index_window+window_size))
-
+            tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             #CLASSIFICATION
             input = pd.DataFrame(ref_array[index_window:index_window+window_size])  #classifica su finestra
             N_TIME_STEPS = 200
@@ -378,7 +382,7 @@ while index_data < ncycles:
                 X = np.asarray(segments).reshape(-1, N_TIME_STEPS, N_FEATURES)
                 y_pred = test_model.predict(X, steps=1, verbose=0)
                 rounded_y_pred = np.argmax(y_pred, axis=-1)
-                print("raw (last element):", rounded_y_pred[-1])
+                #print("raw (last element):", rounded_y_pred[-1])
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
@@ -392,39 +396,27 @@ while index_data < ncycles:
                     Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
                     tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
                     tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-                except Exception as e:
-                    print("tor quat error:", e)
-                try:
                     # ABDOMEN QUATERNION COMPUTATION
                     abd_quat = Quaternion(abd_array[i])
                     Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
                     abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
                     abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
-                except Exception as e:
-                    print("abd quat error:", e)
-                try:
                     # REFERENCE QUATERNION COMPUTATION
                     ref_quat = Quaternion(ref_array[i])
                     Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
                     ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
                     ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
-                except Exception as e:
-                    print("ref quat error:", e)
-                try:
                     # THORAX COMPONENT
                     Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
                     Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
                     t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
                     t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
-                except Exception as e:
-                    print("tor comp error:", e)
-                try:
                     # ABDOMEN COMPONENT
                     Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
                     a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
                     a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
                 except Exception as e:
-                    print("abd comp error:", e)
+                    print("Quatenions error:", e)
 
 
             # fine del calcolo dentro la finestra
@@ -730,11 +722,9 @@ while index_data < ncycles:
     if flag == 1:
         flag = 0
         index_window += incr
-        try:
-            plotupdate()
-            plt.pause(0.01)
-        except Exception as e:
-            print("update plot error:", e)
+        plotupdate()
+        plt.pause(0.01)
+
 
 #END OF WHILE CYCLE. Plot eventually remaining data
 try:
