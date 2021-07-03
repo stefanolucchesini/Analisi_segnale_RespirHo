@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '3luglio.txt'
+filename = '18-17-18-3min.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -191,15 +191,15 @@ def plotupdate():
         plt.clf()
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
-        plt.plot(tor['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.plot(tor['B'].rolling(window=5).sum()/5 * 1881 / 69280, color='red')
         plt.ylim(top=2.65, bottom=1.5)
         plt.subplot(3, 1, 2)
         plt.title('Battery voltage of device 2')
-        plt.plot(abd['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.plot(abd['B'].rolling(window=5).sum()/5 * 1881 / 69280, color='red')
         plt.ylim(top=2.65, bottom=1.5)
         plt.subplot(3, 1, 3)
         plt.title('Battery voltage of device 3')
-        plt.plot(ref['B'].rolling(window=window_size).sum()/window_size * 1881 / 69280, color='red')
+        plt.plot(ref['B'].rolling(window=5).sum()/5 * 1881 / 69280, color='red')
         plt.ylim(top=2.65, bottom=1.5)
     return
 
@@ -289,7 +289,7 @@ while index_data < ncycles:
         quatsconv(3, index_ref)  # device 3 conversion
         index_ref += 1
     # Abdomen (2) dataframe extension
-    check = data.iloc[index_data].str.contains('2')
+    check = data.iloc[index_data].str.contains('02')
     if check['DevID']:  # se device id è 2
         # mette il dato nel dataframe del terzo device
         abd = abd.append(data.iloc[index_data])
@@ -357,13 +357,13 @@ while index_data < ncycles:
                 Ref_pose.append(ref_pose_w)
                 Abd_pose.append(abd_pose_w)
             # takes the 4 quaternions, excludes battery voltage and timestamps
-            tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-            ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-            abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+            tor_array.extend(tor.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
+            ref_array.extend(ref.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
+            abd_array.extend(abd.iloc[index_window:index_window + window_size - incr, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
 
             #CLASSIFICATION
-            input = pd.DataFrame(ref_array)
+            input = pd.DataFrame(ref_array[index_window:index_window+window_size])  #classifica su finestra
             N_TIME_STEPS = 200
             N_FEATURES = 4
             step = 20
