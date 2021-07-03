@@ -1,12 +1,12 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '18-17-18-3min.txt'
+filename = '18rfinti.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 300  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
 start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
-incr = 150  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
+incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
@@ -259,7 +259,7 @@ print("Skipping ", start, "data points")
 from keras.models import load_model
 test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
 labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
-         'sitting', 'running', 'standing', 'supine', 'walking']
+         'sitting', 'running', 'standing', 'supine', 'walking','unknown']
 
 #  PARTE ITERATIVA DEL CODICE
 while index_data < ncycles:
@@ -321,11 +321,6 @@ while index_data < ncycles:
             index_ref_old = index_ref
             index_abd_old = index_abd
             # inizia a lavorare sui dati quando la prima finestra è piena
-            # INTERPOLATE NON VA...fa divergere tutto
-            # tor.interpolate(method='pchip', inplace=True)
-            # abd.interpolate(method='pchip', inplace=True)
-            # ref.interpolate(method='pchip', inplace=True)
-            # tor = tor.loc[1:]
             tor.iloc[index_window:index_window + window_size] = tor.iloc[
                                                                 index_window:index_window + window_size].fillna(
                 method='ffill').fillna(method='bfill')
@@ -366,6 +361,7 @@ while index_data < ncycles:
             ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
             # print("ref", ref.head(index_window+window_size))
+
             #CLASSIFICATION
             input = pd.DataFrame(ref_array)
             N_TIME_STEPS = 200
@@ -386,32 +382,50 @@ while index_data < ncycles:
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
+                predictions.append(labels[-1])
+
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
-                tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
-                Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
-                tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
-                tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-                # ABDOMEN QUATERNION COMPUTATION
-                abd_quat = Quaternion(abd_array[i])
-                Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
-                abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
-                abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
-                # REFERENCE QUATERNION COMPUTATION
-                ref_quat = Quaternion(ref_array[i])
-                Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
-                ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
-                ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
-                # THORAX COMPONENT
-                Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
-                Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
-                t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
-                # ABDOMEN COMPONENT
-                Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
-                a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-                a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
+                try:
+                    tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
+                    Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
+                    tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
+                    tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
+                except Exception as e:
+                    print("tor quat error:", e)
+                try:
+                    # ABDOMEN QUATERNION COMPUTATION
+                    abd_quat = Quaternion(abd_array[i])
+                    Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
+                    abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
+                    abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
+                except Exception as e:
+                    print("abd quat error:", e)
+                try:
+                    # REFERENCE QUATERNION COMPUTATION
+                    ref_quat = Quaternion(ref_array[i])
+                    Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
+                    ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+                    ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
+                except Exception as e:
+                    print("ref quat error:", e)
+                try:
+                    # THORAX COMPONENT
+                    Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
+                    Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
+                    t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                    t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+                except Exception as e:
+                    print("tor comp error:", e)
+                try:
+                    # ABDOMEN COMPONENT
+                    Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
+                    a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+                    a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
+                except Exception as e:
+                    print("abd comp error:", e)
+
 
             # fine del calcolo dentro la finestra
             interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size,
@@ -437,47 +451,54 @@ while index_data < ncycles:
                 EstimSmoothT = np.append(EstimSmoothT, scipy.signal.savgol_filter(np.ravel(newT[window_size - incr:]), SgolayWindowPCA, 3))  # filtra il segnale
                 EstimSmoothA = np.append(EstimSmoothA, scipy.signal.savgol_filter(np.ravel(newA[window_size - incr:]), SgolayWindowPCA, 3))
             # print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
-            # PEAK DETECTION
-            # Thorax
-            diff_T = max(EstimSmoothT) - min(EstimSmoothT)
-            thr_T = diff_T * 5 / 100
-            Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
-            Index_T = Index_T[0]  # ‘peak_heights’ selection
-            fStimVec_T = []
-            if len(Index_T) >= 2:  # at least 2 peaks are needed to compute the intrapeak distance
-                for i in range(len(Index_T) - 1):
-                    intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
-                    fstim = 1 / intrapeak
-                    fStimVec_T.append(fstim)
-                fStimMean_T = statistics.mean(fStimVec_T)
-                fStimstd_T = statistics.stdev(fStimVec_T)
-                lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
-                #print("lowThreshold_T", lowThreshold_T)
-                f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
-                                                nfft=window_size,
-                                                detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
-            # Abdomen
-            diff_A = max(EstimSmoothA) - min(EstimSmoothA)
-            thr_A = diff_A * 5 / 100
-            Index_A = scipy.signal.find_peaks(EstimSmoothA, distance=6, prominence=thr_A)  # find peaks
-            Index_A = Index_A[0]
-            fStimVec_A = []
-            if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
-                # print("len index_A", len(Index_A))
-                for i in range(len(Index_A) - 1):
-                    intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
-                    fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
-                    fStimVec_A.append(fstim)
-                fStimMean_A = statistics.mean(fStimVec_A)
-                fStimstd_A = statistics.stdev(fStimVec_A)
-                lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
-                #print("lowThreshold_A", lowThreshold_A)
-                f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
-                                                nfft=window_size,
-                                                detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
-            if len(Index_A) >= 2 and len(Index_T) >= 2:  # the two thresholds are surely defined
+            try:
+                # PEAK DETECTION
+                # Thorax
+                diff_T = max(EstimSmoothT) - min(EstimSmoothT)
+                thr_T = diff_T * 5 / 100
+                Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
+                Index_T = Index_T[0]  # ‘peak_heights’ selection
+                fStimVec_T = []
+                if len(Index_T) >= 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                    for i in range(len(Index_T) - 1):
+                        intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
+                        fstim = 1 / intrapeak
+                        fStimVec_T.append(fstim)
+                    fStimMean_T = statistics.mean(fStimVec_T)
+                    fStimstd_T = statistics.stdev(fStimVec_T)
+                    lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
+                    #print("lowThreshold_T", lowThreshold_T)
+                    f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
+                                                    nfft=window_size,
+                                                    detrend=False)  # %PCA_1 thoracic spectrum (fT is the nomralized frequency vector)
+            except Exception as e:
+                print("tor peak detection error:", e)
+            try:
+                # Abdomen
+                diff_A = max(EstimSmoothA) - min(EstimSmoothA)
+                thr_A = diff_A * 5 / 100
+                Index_A = scipy.signal.find_peaks(EstimSmoothA, distance=6, prominence=thr_A)  # find peaks
+                Index_A = Index_A[0]
+                fStimVec_A = []
+                if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                    # print("len index_A", len(Index_A))
+                    for i in range(len(Index_A) - 1):
+                        intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
+                        fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
+                        fStimVec_A.append(fstim)
+                    fStimMean_A = statistics.mean(fStimVec_A)
+                    fStimstd_A = statistics.stdev(fStimVec_A)
+                    lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
+                    #print("lowThreshold_A", lowThreshold_A)
+                    f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
+                                                    nfft=window_size,
+                                                    detrend=False)  # PCA_1 abdomen spectrum (fA is the nomralized frequency vector).
+
                 lowThreshold = min(lowThreshold_A,
                                    lowThreshold_T)  # the low threshold is computed as the minimum between the thoracic and the abdominal one
+            except Exception as e:
+                print("abd peak detection error:", e)
+            try:
                 # ABDOMEN MAXIMA AND MINIMA DETECTION
                 Signal_A = -FuseA_1
                 start_A = np.where(f_A > lowThreshold)[0][0] - 1
@@ -522,6 +543,9 @@ while index_data < ncycles:
                     Minima_A.append(min_value)
                     min_index = np.argmin(SmoothSmoothA[Max_Ind_A[i]:Max_Ind_A[i + 1]]) + Max_Ind_A[i]
                     Min_Ind_A.append(min_index)
+            except Exception as e:
+                print("abd max-min detection error:", e)
+            try:
                 # THORAX MAXIMA AND MINIMA DETECTION
                 Signal_T = FuseT_1
                 start_T = np.where(f_T > lowThreshold)[0][0] - 1
@@ -564,138 +588,140 @@ while index_data < ncycles:
                     Minima_T.append(min_value)
                     min_index = np.argmin(SmoothSmoothT[Max_Ind_T[i]:Max_Ind_T[i + 1]]) + Max_Ind_T[i]
                     Min_Ind_T.append(min_index)
-                # RESPIRATORY PARAMETERS ABDOMEN
-                T_A, Ti_A, Te_A, fB_A = [], [], [], []
-                for i in range(len(Min_Ind_A)):
-                    te = (Min_Ind_A[i] - Max_Ind_A[i]) / fdev
-                    ti = (Max_Ind_A[i + 1] - Min_Ind_A[i]) / fdev
-                    Ti_A.append(ti)
-                    Te_A.append(te)
-                    ti_te = ti / te
-                    ttot = ti + te
-                    fb = 1 / ttot * 60
-                    T_A.append(ttot)
-                    fB_A.append(fb)
-                try:
-                    Tmedian_A = statistics.median(T_A)
-                    Timedian_A = statistics.median(Ti_A)
-                    Temedian_A = statistics.median(Te_A)
-                    fBmedian_A = statistics.median(fB_A)
-                    fBspectrum_A = fBspectrum_A * 60
-                    duty_median_A = statistics.median([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                    Tstd_A = statistics.stdev(T_A)
-                    Tistd_A = statistics.stdev(Ti_A)
-                    Testd_A = statistics.stdev(Te_A)
-                    fBstd_A = statistics.stdev(fB_A)
-                    duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
-                    PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
-                    indexes.append(index_window)
-                    SD_A = [fBstd_A, Tistd_A, Testd_A, duty_std_A]
-                    print("index_window", index_window)
-                    print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
-                    print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+            except Exception as e:
+                print("tor max-min detection error:", e)
+            # RESPIRATORY PARAMETERS ABDOMEN
+            T_A, Ti_A, Te_A, fB_A = [], [], [], []
+            for i in range(len(Min_Ind_A)):
+                te = (Min_Ind_A[i] - Max_Ind_A[i]) / fdev
+                ti = (Max_Ind_A[i + 1] - Min_Ind_A[i]) / fdev
+                Ti_A.append(ti)
+                Te_A.append(te)
+                ti_te = ti / te
+                ttot = ti + te
+                fb = 1 / ttot * 60
+                T_A.append(ttot)
+                fB_A.append(fb)
+            try:
+                Tmedian_A = statistics.median(T_A)
+                Timedian_A = statistics.median(Ti_A)
+                Temedian_A = statistics.median(Te_A)
+                fBmedian_A = statistics.median(fB_A)
+                fBspectrum_A = fBspectrum_A * 60
+                duty_median_A = statistics.median([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                Tstd_A = statistics.stdev(T_A)
+                Tistd_A = statistics.stdev(Ti_A)
+                Testd_A = statistics.stdev(Te_A)
+                fBstd_A = statistics.stdev(fB_A)
+                duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
+                PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
+                indexes.append(index_window)
+                SD_A = [fBstd_A, Tistd_A, Testd_A, duty_std_A]
+                print("index_window", index_window)
+                print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
+                print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+            except Exception as e:
+                print("Errore calcolo parametri abd:", e)
+            # RESPIRATORY PARAMETERS THORAX
+            T_T, Ti_T, Te_T, fB_T = [], [], [], []
+            for i in range(len(Min_Ind_T)):
+                te = (Min_Ind_T[i] - Max_Ind_T[i]) / fdev
+                ti = (Max_Ind_T[i + 1] - Min_Ind_T[i]) / fdev
+                Ti_T.append(ti)
+                Te_T.append(te)
+                ttot = ti + te
+                fb = 1 / ttot * 60
+                T_T.append(ttot)
+                fB_T.append(fb)
+            try:
+                Tmedian_T = statistics.median(T_T)
+                Timedian_T = statistics.median(Ti_T)
+                Temedian_T = statistics.median(Te_T)
+                fBmedian_T = statistics.median(fB_T)
+                fBspectrum_T = fBspectrum_T * 60
+                duty_median_T = statistics.median([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                Tstd_T = stats.iqr(T_T)
+                Tistd_T = stats.iqr(Ti_T)
+                Testd_T = stats.iqr(Te_T)
+                fBstd_T = stats.iqr(fB_T)
+                duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
+                PCA_T.append([fBmedian_T, Timedian_T, Temedian_T, duty_median_T])
+                SD_T = [fBstd_T, Tistd_T, Testd_T, duty_std_T]
+                print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
+                print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
+            except Exception as e:
+                print("Errore calcolo parametri tor:", e)
+            # TOTAL RESPIRATORY SIGNAL
+            SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
+            f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
+                                                nfft=window_size, detrend=False)  # Power spectral density computation
+            start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
+            end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
+            fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
+            fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
+            nmax = np.where(f_Tot > 1)[0][0]
+            fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
+            if fBspectrum_Tot * 60 < 12:
+                perc_Tot = 15
+                distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
+                SgolayWindow = 15
+            elif 12 < fBspectrum_Tot * 60 < 20:
+                perc_Tot = 8
+                distance_Tot = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
+                SgolayWindow = 11
+            else:
+                perc_Tot = 5
+                distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
+                SgolayWindow = 9
+            diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
+            thr_SSTot = diff_SSTot * perc_Tot / 100
 
-                except Exception as e:
-                    print("Errore calcolo parametri abd:", e)
-                # RESPIRATORY PARAMETERS THORAX
-                T_T, Ti_T, Te_T, fB_T = [], [], [], []
-                for i in range(len(Min_Ind_T)):
-                    te = (Min_Ind_T[i] - Max_Ind_T[i]) / fdev
-                    ti = (Max_Ind_T[i + 1] - Min_Ind_T[i]) / fdev
-                    Ti_T.append(ti)
-                    Te_T.append(te)
-                    ttot = ti + te
-                    fb = 1 / ttot * 60
-                    T_T.append(ttot)
-                    fB_T.append(fb)
+            Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
+            Max_Ind_Tot = Max_Ind_Tot[0]
+            Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
+            Min_Ind_Tot, Minima_Tot = [], []
+            for i in range(len(Max_Ind_Tot) - 1):
+                min_value = min(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]])
+                Minima_Tot.append(min_value)
+                min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
+                Min_Ind_Tot.append(min_index)
+            # TOTAL RESPIRATORY PARAMS
+            T_Tot, Ti_Tot, Te_Tot, fB_Tot = [], [], [], []
+            for i in range(len(Min_Ind_Tot)):
+                te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
+                ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
+                Ti_Tot.append(ti)
+                Te_Tot.append(te)
+                ttot = ti + te
+                fb = (1 / ttot) * 60
+                T_Tot.append(ttot)
+                fB_Tot.append(fb)
+            try:
+                #MEDIANA
+                Tmed_Tot = statistics.median(T_Tot)
+                Timed_Tot = statistics.median(Ti_Tot)
+                Temed_Tot = statistics.median(Te_Tot)
+                fBmed_Tot = statistics.median(fB_Tot)
+                fBspectrum_T = fBspectrum_T * 60
+                duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                #INTERQUARTILE
+                Tirq_Tot = stats.iqr(T_Tot)
+                Tiirq_Tot = stats.iqr(Ti_Tot)
+                Teirq_Tot = stats.iqr(Te_Tot)
+                fBirq_Tot = stats.iqr(fB_Tot)
+                duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
+                Tot_med.append([fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot])
+                Tot_Iqr.append([fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot])
                 try:
-                    Tmedian_T = statistics.median(T_T)
-                    Timedian_T = statistics.median(Ti_T)
-                    Temedian_T = statistics.median(Te_T)
-                    fBmedian_T = statistics.median(fB_T)
-                    fBspectrum_T = fBspectrum_T * 60
-                    duty_median_T = statistics.median([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                    Tstd_T = stats.iqr(T_T)
-                    Tistd_T = stats.iqr(Ti_T)
-                    Testd_T = stats.iqr(Te_T)
-                    fBstd_T = stats.iqr(fB_T)
-                    duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
-                    PCA_T.append([fBmedian_T, Timedian_T, Temedian_T, duty_median_T])
-                    SD_T = [fBstd_T, Tistd_T, Testd_T, duty_std_T]
-                    print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
-                    print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
+                    predictions.append(labels[rounded_y_pred[-1]])
                 except Exception as e:
-                    print("Errore calcolo parametri tor:", e)
-                # TOTAL RESPIRATORY SIGNAL
-                SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
-                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
-                                                    nfft=window_size, detrend=False)  # Power spectral density computation
-                start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
-                end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
-                fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
-                fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
-                nmax = np.where(f_Tot > 1)[0][0]
-                fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
-                if fBspectrum_Tot * 60 < 12:
-                    perc_Tot = 15
-                    distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
-                    SgolayWindow = 15
-                elif 12 < fBspectrum_Tot * 60 < 20:
-                    perc_Tot = 8
-                    distance_Tot = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
-                    SgolayWindow = 11
-                else:
-                    perc_Tot = 5
-                    distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
-                    SgolayWindow = 9
-                diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
-                thr_SSTot = diff_SSTot * perc_Tot / 100
-
-                Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
-                Max_Ind_Tot = Max_Ind_Tot[0]
-                Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
-                Min_Ind_Tot, Minima_Tot = [], []
-                for i in range(len(Max_Ind_Tot) - 1):
-                    min_value = min(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]])
-                    Minima_Tot.append(min_value)
-                    min_index = np.argmin(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]]) + Max_Ind_Tot[i]
-                    Min_Ind_Tot.append(min_index)
-                # TOTAL RESPIRATORY PARAMS
-                T_Tot, Ti_Tot, Te_Tot, fB_Tot = [], [], [], []
-                for i in range(len(Min_Ind_Tot)):
-                    te = (Min_Ind_Tot[i] - Max_Ind_Tot[i]) / fdev
-                    ti = (Max_Ind_Tot[i + 1] - Min_Ind_Tot[i]) / fdev
-                    Ti_Tot.append(ti)
-                    Te_Tot.append(te)
-                    ttot = ti + te
-                    fb = (1 / ttot) * 60
-                    T_Tot.append(ttot)
-                    fB_Tot.append(fb)
-                try:
-                    #MEDIANA
-                    Tmed_Tot = statistics.median(T_Tot)
-                    Timed_Tot = statistics.median(Ti_Tot)
-                    Temed_Tot = statistics.median(Te_Tot)
-                    fBmed_Tot = statistics.median(fB_Tot)
-                    fBspectrum_T = fBspectrum_T * 60
-                    duty_med_Tot = statistics.median([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    #INTERQUARTILE
-                    Tirq_Tot = stats.iqr(T_Tot)
-                    Tiirq_Tot = stats.iqr(Ti_Tot)
-                    Teirq_Tot = stats.iqr(Te_Tot)
-                    fBirq_Tot = stats.iqr(fB_Tot)
-                    duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
-                    Tot_med.append([fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot])
-                    Tot_Iqr.append([fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot])
-                    try:
-                        predictions.append(labels[rounded_y_pred[-1]])
-                    except Exception as e:
-                        print(e)
-                    print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
-                    print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]], "\n")
-                    print("--------------------------------------------------------------------------------------\n")
-                except Exception as e:
-                    print("Errore calcolo parameteri totale:", e)
+                    print('pred append error:',e)
+                    predictions.append(labels[-1])
+                print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
+                print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]], "\n")
+                print("--------------------------------------------------------------------------------------\n")
+            except Exception as e:
+                print("Errore calcolo parameteri totale:", e)
 
     index_data += 1  # global
     if flag == 1:
