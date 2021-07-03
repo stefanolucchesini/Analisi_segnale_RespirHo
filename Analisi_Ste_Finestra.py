@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = '18rfinti.txt'
+filename = '3luglio.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -11,7 +11,7 @@ incr = 300  # Overlapping between a window and the following. 1=max overlap. MUS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency
-batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
+batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
 
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
@@ -239,9 +239,9 @@ ref_quat, Ref_pose_quat = Quaternion(), Quaternion()
 abd_quat, Abd_pose_quat = Quaternion(), Quaternion()
 FuseT_1, FuseA_1 = [], []
 tor_array, abd_array, ref_array = [], [], []
-SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = 0, 0, 0, 0, 0
-SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = 0, 0, 0, 0, 0
-SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = 0, 0, 0
+SmoothSmoothA, Max_Ind_A, Maxima_A, Min_Ind_A, Minima_A = [], [], [], [], []
+SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = [], [], [], [], []
+SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = [], [], []
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
 PCA_A, PCA_T, Tot_med, Tot_Iqr, indexes, predictions = [], [], [], [], [], []  #per plot parametri respiratori
@@ -259,7 +259,7 @@ print("Skipping ", start, "data points")
 from keras.models import load_model
 test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
 labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
-         'sitting', 'running', 'standing', 'supine', 'walking','unknown']
+         'sitting', 'running', 'standing', 'supine', 'walking', 'unknown']
 
 #  PARTE ITERATIVA DEL CODICE
 while index_data < ncycles:
@@ -454,12 +454,12 @@ while index_data < ncycles:
             try:
                 # PEAK DETECTION
                 # Thorax
-                diff_T = max(EstimSmoothT) - min(EstimSmoothT)
+                diff_T = max(EstimSmoothT[index_window:index_window + window_size]) - min(EstimSmoothT[index_window:index_window + window_size])
                 thr_T = diff_T * 5 / 100
                 Index_T = scipy.signal.find_peaks(EstimSmoothT, distance=6, prominence=thr_T)
                 Index_T = Index_T[0]  # ‘peak_heights’ selection
                 fStimVec_T = []
-                if len(Index_T) >= 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                if len(Index_T) > 2:  # at least 3 peaks are needed to compute the intrapeak distance
                     for i in range(len(Index_T) - 1):
                         intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                         fstim = 1 / intrapeak
@@ -475,12 +475,12 @@ while index_data < ncycles:
                 print("tor peak detection error:", e)
             try:
                 # Abdomen
-                diff_A = max(EstimSmoothA) - min(EstimSmoothA)
+                diff_A = max(EstimSmoothA[index_window:index_window + window_size]) - min(EstimSmoothA[index_window:index_window + window_size])
                 thr_A = diff_A * 5 / 100
                 Index_A = scipy.signal.find_peaks(EstimSmoothA, distance=6, prominence=thr_A)  # find peaks
                 Index_A = Index_A[0]
                 fStimVec_A = []
-                if len(Index_A) > 2:  # at least 2 peaks are needed to compute the intrapeak distance
+                if len(Index_A) > 2:  # at least 3 peaks are needed to compute the intrapeak distance
                     # print("len index_A", len(Index_A))
                     for i in range(len(Index_A) - 1):
                         intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
@@ -651,35 +651,38 @@ while index_data < ncycles:
                 print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
             except Exception as e:
                 print("Errore calcolo parametri tor:", e)
-            # TOTAL RESPIRATORY SIGNAL
-            SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
-            f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
-                                                nfft=window_size, detrend=False)  # Power spectral density computation
-            start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
-            end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
-            fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
-            fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
-            nmax = np.where(f_Tot > 1)[0][0]
-            fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
-            if fBspectrum_Tot * 60 < 12:
-                perc_Tot = 15
-                distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
-                SgolayWindow = 15
-            elif 12 < fBspectrum_Tot * 60 < 20:
-                perc_Tot = 8
-                distance_Tot = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
-                SgolayWindow = 11
-            else:
-                perc_Tot = 5
-                distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
-                SgolayWindow = 9
-            diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
-            thr_SSTot = diff_SSTot * perc_Tot / 100
+            try:
+                # TOTAL RESPIRATORY SIGNAL
+                SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
+                f_Tot, pxx_Tot = scipy.signal.welch(SmoothSmoothTot, window='hamming', fs=fdev, nperseg=window_size, noverlap=incr,
+                                                    nfft=window_size, detrend=False)  # Power spectral density computation
+                start_Tot = np.where(f_Tot > lowThreshold)[0][0] - 1
+                end_Tot = np.where(f_Tot > f_threshold_max)[0][0]
+                fBmax_Tot = max(pxx_Tot[start_Tot:end_Tot])
+                fBI_Tot = np.where(pxx_Tot[start_Tot:end_Tot] == fBmax_Tot)[0][0]
+                nmax = np.where(f_Tot > 1)[0][0]
+                fBspectrum_Tot = f_Tot[fBI_Tot + start_Tot]
+                if fBspectrum_Tot * 60 < 12:
+                    perc_Tot = 15
+                    distance_Tot = 35  # min peak distance of 35 frames corresponds to a respiratory rate of 17 resp/min
+                    SgolayWindow = 15
+                elif 12 < fBspectrum_Tot * 60 < 20:
+                    perc_Tot = 8
+                    distance_Tot = 20  # min peak distance of 20 frames corresponds to a respiratory rate of 30 resp/min
+                    SgolayWindow = 11
+                else:
+                    perc_Tot = 5
+                    distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
+                    SgolayWindow = 9
+                diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
+                thr_SSTot = diff_SSTot * perc_Tot / 100
 
-            Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
-            Max_Ind_Tot = Max_Ind_Tot[0]
-            Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
-            Min_Ind_Tot, Minima_Tot = [], []
+                Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
+                Max_Ind_Tot = Max_Ind_Tot[0]
+                Maxima_Tot = SmoothSmoothTot[Max_Ind_Tot]
+                Min_Ind_Tot, Minima_Tot = [], []
+            except Exception as e:
+                print("total resp signal error:", e)
             for i in range(len(Max_Ind_Tot) - 1):
                 min_value = min(SmoothSmoothTot[Max_Ind_Tot[i]:Max_Ind_Tot[i + 1]])
                 Minima_Tot.append(min_value)
@@ -727,8 +730,11 @@ while index_data < ncycles:
     if flag == 1:
         flag = 0
         index_window += incr
-        plotupdate()
-        plt.pause(0.01)
+        try:
+            plotupdate()
+            plt.pause(0.01)
+        except Exception as e:
+            print("update plot error:", e)
 
 #END OF WHILE CYCLE. Plot eventually remaining data
 try:
