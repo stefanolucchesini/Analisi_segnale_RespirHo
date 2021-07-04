@@ -4,8 +4,8 @@ filename = '3luglio.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 80000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
+start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+stop = 6000  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
@@ -250,7 +250,7 @@ SmoothSmoothT, Max_Ind_T, Maxima_T, Min_Ind_T, Minima_T = [], [], [], [], []
 SmoothSmoothTot, Max_Ind_Tot, Maxima_Tot = [], [], []
 pxx_Tot, fBI_Tot, start_Tot, fBmax_Tot = 0, 0, 0, 0
 f_Tot = [0]
-PCA_A, PCA_T, Tot_med, Tot_Iqr, indexes, predictions = [], [], [], [], [], []  #per plot parametri respiratori
+PCA_A, SD_A, PCA_T, SD_T, Tot_med, Tot_Iqr, indexes, predictions = [], [], [], [], [], [], [], []  #per plot parametri respiratori
 Min_Ind_Tot, Minima_Tot = [], []  #for plotting
 
 index_window = 0  # for computing things inside the window
@@ -386,8 +386,6 @@ while index_data < ncycles:
                 print('Prediction:', labels[rounded_y_pred[-1]])
             except Exception as e:
                 print("Prediction error:", e)
-                predictions.append(labels[-1])
-
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
@@ -456,8 +454,12 @@ while index_data < ncycles:
                         intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                         fstim = 1 / intrapeak
                         fStimVec_T.append(fstim)
-                    fStimMean_T = statistics.mean(fStimVec_T)
-                    fStimstd_T = statistics.stdev(fStimVec_T)
+                    if len(fStimVec_T) > 1200:
+                        fStimMean_T = statistics.mean(fStimVec_T[-1200])  # trova picchi sugli ultimi 2 minuti
+                        fStimstd_T = statistics.stdev(fStimVec_T[-1200])
+                    else:
+                        fStimMean_T = statistics.mean(fStimVec_T)
+                        fStimstd_T = statistics.stdev(fStimVec_T)
                     lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
                     #print("lowThreshold_T", lowThreshold_T)
                     f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
@@ -478,8 +480,12 @@ while index_data < ncycles:
                         intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
                         fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
                         fStimVec_A.append(fstim)
-                    fStimMean_A = statistics.mean(fStimVec_A)
-                    fStimstd_A = statistics.stdev(fStimVec_A)
+                    if len(fStimVec_A) > 1200:
+                        fStimMean_A = statistics.mean(fStimVec_A[-1200]) # trova picchi sugli ultimi 2 minuti
+                        fStimstd_A = statistics.stdev(fStimVec_A[-1200])
+                    else:
+                        fStimMean_A = statistics.mean(fStimVec_A)
+                        fStimstd_A = statistics.stdev(fStimVec_A)
                     lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
                     #print("lowThreshold_A", lowThreshold_A)
                     f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
@@ -608,10 +614,10 @@ while index_data < ncycles:
                 duty_std_A = statistics.stdev([float(Ti_A / T_A) for Ti_A, T_A in zip(Ti_A, T_A)])
                 PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
                 indexes.append(index_window)
-                SD_A = [fBstd_A, Tistd_A, Testd_A, duty_std_A]
+                SD_A.append([fBstd_A, Tistd_A, Testd_A, duty_std_A])
                 print("index_window", index_window)
                 print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
-                print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+                print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A[-1]], "\n")
             except Exception as e:
                 print("Errore calcolo parametri abd:", e)
             # RESPIRATORY PARAMETERS THORAX
@@ -638,9 +644,9 @@ while index_data < ncycles:
                 fBstd_T = stats.iqr(fB_T)
                 duty_std_T = stats.iqr([float(Ti_T / T_T) for Ti_T, T_T in zip(Ti_T, T_T)])
                 PCA_T.append([fBmedian_T, Timedian_T, Temedian_T, duty_median_T])
-                SD_T = [fBstd_T, Tistd_T, Testd_T, duty_std_T]
+                SD_T.append([fBstd_T, Tistd_T, Testd_T, duty_std_T])
                 print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
-                print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
+                print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T[-1]], "\n")
             except Exception as e:
                 print("Errore calcolo parametri tor:", e)
             try:
@@ -730,19 +736,23 @@ while index_data < ncycles:
 try:
     print("final index_window:", index_window)
     print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
-    print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A], "\n")
+    print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A[-1]], "\n")
     print("fBmedian_Thorax, Ti_median_Thorax, Te_median_Thorax, duty_median_Thorax\n", [round(i, 2) for i in PCA_T[-1]])
-    print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T], "\n")
+    print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T[-1]], "\n")
     print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med[-1]])
     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]])
 except Exception as e:
     print("Errore finale", e)
 
 #EXPORT ELABORATED DATA TO CSV FILE
+
 dftot = pd.DataFrame(Tot_med, columns=["fB_median_Tot", "Ti_median_Tot", "Te_median_Tot", "duty_median_Tot"])
 dfa = pd.DataFrame(PCA_A, columns=["fBmedian_Abdomen", "Ti_median_Abdomen", "Te_median_Abdomen", "duty_median_Abdomen"])
 dft = pd.DataFrame(PCA_T, columns=["fB_median_Thorax", "Ti_median_Thorax", "Te_median_Thorax", "duty_median_Thorax"])
-tot = pd.concat([dft, dfa, dftot], axis=1)
+dfiqra = pd.DataFrame(SD_A, columns=["fBirq_Thorax", "Tiirq_Thorax", "Teirq_Thorax", "duty_irq_Thorax"])
+dfiqrt = pd.DataFrame(SD_T, columns=["fBirq_Abd", "Tiirq_Abd", "Teirq_Abd", "duty_irq_Abd"])
+dfiqrtot = pd.DataFrame(Tot_Iqr, columns=["fBirq_Tot", "Tiirq_Tot", "Teirq_Tot", "duty_irq_Tot"])
+tot = pd.concat([dft, dfiqrt, dfa, dfiqra, dftot, dfiqrtot], axis=1)
 tot['index'] = indexes
 tot['activity'] = predictions
 tot = tot.set_index('index')

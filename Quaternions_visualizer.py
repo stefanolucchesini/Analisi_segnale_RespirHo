@@ -202,4 +202,5 @@ while index_data < ncycles:
         count = 0
         plotupdate()
         plt.pause(0.01)
+print("END")
 plt.show()
