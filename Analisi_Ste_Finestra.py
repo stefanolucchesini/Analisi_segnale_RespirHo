@@ -4,14 +4,14 @@ filename = 'ste7.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 5000  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-stop = 10000  # number of sample at which program execution will stop, 0 will run the whole txt file
+start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency, 0 disables it
-batteryplot = 0  # 1 enables plotting battery voltages, 0 disables it
+batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
 prediction_enabled = 0  # 1 enables posture prediction, 0 disables it
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
@@ -31,6 +31,7 @@ import scipy.signal
 from sklearn.decomposition import PCA
 import scipy.stats as stats
 import warnings
+import time
 if prediction_enabled:
     from keras.models import load_model
     test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
@@ -39,7 +40,7 @@ if prediction_enabled:
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-
+start_time = time.time()
 
 def quatsconv(device, i):
     if device == 3:
@@ -269,13 +270,12 @@ print("Skipping ", start, "data points")
 #  PARTE ITERATIVA DEL CODICE
 while index_data < ncycles:
     #print("GLOBAL INDEX:", index_data)
-    # transforming into string in order to remove [ and ] from the file\
+    # transforming into string in order to remove [ and ] from the file
     data.iloc[index_data] = data.iloc[index_data].astype(str)
     data.iloc[index_data] = data.iloc[index_data].str.replace('[', '')
     data.iloc[index_data] = data.iloc[index_data].str.replace(']', '')
-    data.iloc[index_data, 1:8] = data.iloc[index_data, 1:8].apply(int,
-                                                                  base=16)  # convert to base 10 everything but DevID and timestamp
-
+    # convert to base 10 everything but DevID and timestamp
+    data.iloc[index_data, 1:8] = data.iloc[index_data, 1:8].apply(int, base=16)
     # Mette NAN ai quaternioni se il pacchetto è invalido
     if data.iloc[index_data, 2] == 255:  # 2 è la colonna C
         data.iloc[index_data, 4:8] = np.nan
@@ -384,8 +384,10 @@ while index_data < ncycles:
                     rounded_y_pred = np.argmax(y_pred, axis=-1)
                     #print("raw (last element):", rounded_y_pred[-1])
                     print('Prediction:', labels[rounded_y_pred[-1]])
+                    predictions.append(labels[rounded_y_pred[-1]])
                 except Exception as e:
                     print("Prediction error:", e)
+                    predictions.append(labels[-1])
 
             for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
                 # THORAX QUATERNION COMPUTATION
@@ -455,8 +457,8 @@ while index_data < ncycles:
                         fstim = 1 / intrapeak
                         fStimVec_T.append(fstim)
                     if len(fStimVec_T) > 1200:
-                        fStimMean_T = statistics.mean(fStimVec_T[-1200])  # trova picchi sugli ultimi 2 minuti
-                        fStimstd_T = statistics.stdev(fStimVec_T[-1200])
+                        fStimMean_T = statistics.mean(fStimVec_T[-1200:])  # trova picchi sugli ultimi 2 minuti
+                        fStimstd_T = statistics.stdev(fStimVec_T[-1200:])
                     else:
                         fStimMean_T = statistics.mean(fStimVec_T)
                         fStimstd_T = statistics.stdev(fStimVec_T)
@@ -481,8 +483,8 @@ while index_data < ncycles:
                         fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
                         fStimVec_A.append(fstim)
                     if len(fStimVec_A) > 1200:
-                        fStimMean_A = statistics.mean(fStimVec_A[-1200]) # trova picchi sugli ultimi 2 minuti
-                        fStimstd_A = statistics.stdev(fStimVec_A[-1200])
+                        fStimMean_A = statistics.mean(fStimVec_A[-1200:]) # trova picchi sugli ultimi 2 minuti
+                        fStimstd_A = statistics.stdev(fStimVec_A[-1200:])
                     else:
                         fStimMean_A = statistics.mean(fStimVec_A)
                         fStimstd_A = statistics.stdev(fStimVec_A)
@@ -620,6 +622,9 @@ while index_data < ncycles:
                 print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A[-1]], "\n")
             except Exception as e:
                 print("Errore calcolo parametri abd:", e)
+                SD_A.append([np.nan, np.nan, np.nan, np.nan])
+                PCA_A.append([np.nan, np.nan, np.nan, np.nan])
+                indexes.append(index_window)
             # RESPIRATORY PARAMETERS THORAX
             T_T, Ti_T, Te_T, fB_T = [], [], [], []
             for i in range(len(Min_Ind_T)):
@@ -649,6 +654,8 @@ while index_data < ncycles:
                 print("fBirq_Thorax, Tiirq_Thorax, Teirq_Thorax, duty_irq_Thorax\n", [round(i, 2) for i in SD_T[-1]], "\n")
             except Exception as e:
                 print("Errore calcolo parametri tor:", e)
+                SD_T.append([np.nan, np.nan, np.nan, np.nan])
+                PCA_T.append([np.nan, np.nan, np.nan, np.nan])
             try:
                 # TOTAL RESPIRATORY SIGNAL
                 SmoothSmoothTot = SmoothSmoothT + SmoothSmoothA
@@ -713,26 +720,23 @@ while index_data < ncycles:
                 duty_irq_Tot = stats.iqr([float(Ti_Tot / T_Tot) for Ti_Tot, T_Tot in zip(Ti_Tot, T_Tot)])
                 Tot_med.append([fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot])
                 Tot_Iqr.append([fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot])
-                if prediction_enabled:
-                    try:
-                        predictions.append(labels[rounded_y_pred[-1]])
-                    except Exception as e:
-                        print('pred append error:',e)
-                        predictions.append(labels[-1])
                 print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
                 print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]], "\n")
                 print("--------------------------------------------------------------------------------------\n")
             except Exception as e:
                 print("Errore calcolo parameteri totale:", e)
+                Tot_med.append([np.nan, np.nan, np.nan, np.nan])
+                Tot_Iqr.append([np.nan, np.nan, np.nan, np.nan])
+
 
     index_data += 1  # global
     if flag == 1:
         flag = 0
         #print("len indexes", len(indexes), "len tot med", len(Tot_med), "len tot PCA_A", len(PCA_A))
         index_window += incr
-        if index_window >= ncycles - 5*index_window:  #mostra il grafico quando è quasi alla fine
-            plotupdate()
-            plt.pause(0.01)
+        #if index_window >= ncycles - index_window:  #mostra il grafico quando è quasi alla fine
+        #    plotupdate()
+        #    plt.pause(0.01)
 
 
 #END OF WHILE CYCLE. Plot eventually remaining data
@@ -745,7 +749,7 @@ try:
     print("fBmed_Tot, Timed_Tot, Temed_Tot, duty_med_Tot\n", [round(i, 2) for i in Tot_med[-1]])
     print("fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]])
 except Exception as e:
-    print("Errore finale", e)
+    print("Errore print finale", e)
 
 #EXPORT ELABORATED DATA TO CSV FILE
 
@@ -756,11 +760,14 @@ dfiqra = pd.DataFrame(SD_A, columns=["fBirq_Thorax", "Tiirq_Thorax", "Teirq_Thor
 dfiqrt = pd.DataFrame(SD_T, columns=["fBirq_Abd", "Tiirq_Abd", "Teirq_Abd", "duty_irq_Abd"])
 dfiqrtot = pd.DataFrame(Tot_Iqr, columns=["fBirq_Tot", "Tiirq_Tot", "Teirq_Tot", "duty_irq_Tot"])
 tot = pd.concat([dft, dfiqrt, dfa, dfiqra, dftot, dfiqrtot], axis=1)
-tot['index'] = indexes
+
 if prediction_enabled:
     tot['activity'] = predictions
+
+tot['index'] = indexes
 tot = tot.set_index('index')
 tot.to_csv('total_params_out.csv')
+print("--- Computing time: %s minutes ---" % round((time.time() - start_time)/60, 2))
 print("END")
 
 plotupdate()
