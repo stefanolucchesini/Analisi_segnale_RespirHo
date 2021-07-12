@@ -1,10 +1,10 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'ste7.txt'
+filename = 'ste12.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 0  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+start = 500  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
@@ -234,9 +234,9 @@ else:
 fdev = 10
 print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
-tor = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
-abd = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
-ref = pd.DataFrame(columns=['DevID', 'B', 'C', 'nthvalue', '1', '2', '3', '4'])
+tor = pd.DataFrame(columns=['B', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec'])
+abd = pd.DataFrame(columns=['B', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec'])
+ref = pd.DataFrame(columns=['B', '1', '2', '3', '4', 'day', 'month', 'hour', 'min', 'sec', 'millisec'])
 index_tor, index_abd, index_ref = 0, 0, 0  # indici per dataframe dei device
 index_tor_old, index_abd_old, index_ref_old = 0, 0, 0  # indici all'iterazione precedente
 tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
@@ -265,7 +265,7 @@ index_data = 3 * start  # global index for total data
 length = len(data)
 ncycles = length if stop == 0 else 3*stop
 print("Il dataset ha", length, "campioni")
-print("Skipping ", start, "data points")
+print("Skipping first", start, "data points")
 
 #  PARTE ITERATIVA DEL CODICE
 while index_data < ncycles:
@@ -288,7 +288,7 @@ while index_data < ncycles:
         # mette il dato nel dataframe del terzo device
         ref = ref.append(data.iloc[index_data])
         ref = ref.reset_index(drop=True)
-        ref = ref.drop(['DevID', 'C', 'nthvalue'], axis=1)  # Leave only battery, quaternions and timestamp data
+        ref = ref.drop(['DevID', 'C', 'nthvalue'], axis=1)
         ref = ref.astype(float)
         # conversion of quaternions in range [-1:1]
         quatsconv(3, index_ref)  # device 3 conversion
@@ -532,7 +532,7 @@ while index_data < ncycles:
                     distance_A = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
                     SgolayWindow = 9
                 SmoothSmoothA = scipy.signal.savgol_filter(bpfilt_A, SgolayWindow, 3)
-                diff_SSA = max(SmoothSmoothA) - min(SmoothSmoothA)
+                diff_SSA = max(SmoothSmoothA[index_window:index_window + window_size]) - min(SmoothSmoothA[index_window:index_window + window_size])
                 thr_SSA = diff_SSA * perc_A / 100
                 Max_Ind_A = scipy.signal.find_peaks(SmoothSmoothA, distance=distance_A, prominence=thr_SSA)
                 Max_Ind_A = Max_Ind_A[0]
@@ -577,7 +577,7 @@ while index_data < ncycles:
                     distance_T = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
                     SgolayWindow = 9
                 SmoothSmoothT = scipy.signal.savgol_filter(bpfilt_T, SgolayWindow, 3)
-                diff_SST = max(SmoothSmoothT) - min(SmoothSmoothT)
+                diff_SST = max(SmoothSmoothT[index_window:index_window + window_size]) - min(SmoothSmoothT[index_window:index_window + window_size])
                 thr_SST = diff_SST * perc_T / 100
                 Max_Ind_T = scipy.signal.find_peaks(SmoothSmoothT, distance=distance_T, prominence=thr_SST)
                 Max_Ind_T = Max_Ind_T[0]
@@ -679,7 +679,7 @@ while index_data < ncycles:
                     perc_Tot = 5
                     distance_Tot = 9  # min peak distance of 12 frames corresponds to a frequency rate of 50 resp/min
                     SgolayWindow = 9
-                diff_SSTot = max(SmoothSmoothTot) - min(SmoothSmoothTot)
+                diff_SSTot = max(SmoothSmoothTot[index_window:index_window + window_size]) - min(SmoothSmoothTot[index_window:index_window + window_size])
                 thr_SSTot = diff_SSTot * perc_Tot / 100
 
                 Max_Ind_Tot = scipy.signal.find_peaks(SmoothSmoothTot, distance=distance_Tot, prominence=thr_SSTot)
@@ -722,6 +722,8 @@ while index_data < ncycles:
                 Tot_Iqr.append([fBirq_Tot, Tiirq_Tot, Teirq_Tot, duty_irq_Tot])
                 print("fB_median_Tot, Ti_median_Tot, Te_median_Tot, duty_median_Tot\n", [round(i, 2) for i in Tot_med[-1]])
                 print("fB_irq_Tot, Ti_irq_Tot, Te_irq_Tot, duty_irq_Tot\n", [round(i, 2) for i in Tot_Iqr[-1]], "\n")
+                print("--- Tempo trascorso: %s minuti ---" % round((time.time() - start_time) / 60, 2))
+                print("--- Tempo acquisizione:", round(index_window / 600, 2), "minuti ---")
                 print("--------------------------------------------------------------------------------------\n")
             except Exception as e:
                 print("Errore calcolo parameteri totale:", e)
