@@ -1,10 +1,10 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'ste12.txt'
+filename = 'test.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 500  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
+start = 200  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
 stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
