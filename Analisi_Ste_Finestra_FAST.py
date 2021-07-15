@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'test.txt'
+filename = 'ste13.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -12,7 +12,7 @@ w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency and duty cycle, 0 disables it
 batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
-prediction_enabled = 0  # 1 enables posture prediction, 0 disables it
+prediction_enabled = 1  # 1 enables posture prediction, 0 disables it
 # THRESHOLDS
 static_f_threshold_max = 1  # Static, Cycling
 walking_f_threshold_max = 1  # 0.75
@@ -35,8 +35,8 @@ import time
 if prediction_enabled:
     from keras.models import load_model
     test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
-    labels = ['cyclette', 'lying_left', 'lying_right', 'prone', 'stairs',
-             'sitting', 'running', 'standing', 'supine', 'walking', 'unknown']
+    labels = ['cyclette', 'stairs', 'supine', 'prone', 'lying_left',
+             'lying_right', 'running', 'standing', 'sitting', 'walking', 'unknown']
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -333,12 +333,13 @@ while index_window < ncycles-window_size-start:
     abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
     #CLASSIFICATION
     if prediction_enabled:
-        input = pd.DataFrame(ref_array[index_window:index_window+window_size])  #classifica su finestra
-        N_TIME_STEPS = window_size - 1
+        input = pd.DataFrame(ref_array[index_window:])  #classifica su finestra
+        N_TIME_STEPS = 200
         N_FEATURES = 4
-        step = incr
+        step = 20
         segments = []
         try:
+            #print("len input", len(input))
             for i in range(0, len(input) - N_TIME_STEPS, step):
                 quat_1 = input[0].values[i: i + N_TIME_STEPS]
                 quat_2 = input[1].values[i: i + N_TIME_STEPS]

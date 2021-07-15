@@ -1,23 +1,16 @@
+win = 10
 globals().clear()
 import matplotlib.pyplot as plt
 import pandas as pd
-filename = 'totalpar.csv'
-# PLOTTING & COMPUTING OPTIONS
-w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
-resp_param_plot = 1  # 1 enables plotting respiratory frequency, 0 disables it
-
+filename = 'ste13.csv'  #file contenente parametri respiratori calcolati
+win = 10  # window in time
 data = pd.read_csv(filename)
 data['index'] /= 600 #conversione in minuti
+#data['index'] /= 60 #conversione in ore
+print(data['index'])
 index = data['index']
 data = data.set_index('index')
-print(data)
-'''
-data.columns = ["fB_median_Tot", "Ti_median_Tot", "Te_median_Tot", "duty_median_Tot", "fBmedian_Abdomen",
-                "Ti_median_Abdomen", "Te_median_Abdomen", "duty_median_Abdomen", "fB_median_Thorax",
-                "Ti_median_Thorax", "Te_median_Thorax", "duty_median_Thorax", "fBirq_Thorax", "Tiirq_Thorax",
-                "Teirq_Thorax", "duty_irq_Thorax", "fBirq_Abd", "Tiirq_Abd", "Teirq_Abd", "duty_irq_Abd",
-                "fBirq_Tot", "Tiirq_Tot", "Teirq_Tot", "duty_irq_Tot"]
-'''
+
 df = data[["duty_median_Abdomen", "duty_median_Thorax", "duty_median_Tot"]]
 df2 = data[["duty_median_Tot", "duty_median_Abdomen", "duty_median_Thorax"]]
 
@@ -26,22 +19,37 @@ df.boxplot()
 
 plt.figure(2)
 plt.subplot(3, 1, 1)
+plt.ylim(14, 20)
 plt.title('fB_median_Thorax')
+data["fB_median_Thorax"] = data["fB_median_Thorax"].rolling(window=win).sum() / win
 data["fB_median_Thorax"].plot()
 plt.ylabel('resp/min')
+plt.xlabel('time (minutes)')
+plt.xlim(0)
 plt.subplot(3, 1, 2)
 plt.title('fB_median_Abdomen')
+data["fBmedian_Abdomen"] = data["fBmedian_Abdomen"].rolling(window=win).sum() / win
 data["fBmedian_Abdomen"].plot()
+plt.ylim(14, 20)
+plt.xlim(0)
+plt.xlabel('time (minutes)')
 plt.ylabel('resp/min')
 plt.subplot(3, 1, 3)
 plt.title('fB_median_Tot')
-data[ "fB_median_Tot"].plot()
+data["fB_median_Tot"] = data["fB_median_Tot"].rolling(window=win).sum() / win
+data["fB_median_Tot"].plot()
 plt.xlabel('time (minutes)')
 plt.ylabel('resp/min')
-
+plt.ylim(14, 20)
+plt.xlim(0)
 plt.figure(3)
 plt.title('minimum duty cycle')
-plt.plot(index, [min(df2.iloc[x, 0], df2.iloc[x, 1], df2.iloc[x, 2]) for x in range(len(index))])
+listduty = [min(df2.iloc[x, 0], df2.iloc[x, 1], df2.iloc[x, 2]) for x in range(len(index))]
+listduty = pd.DataFrame(listduty, index=index)
+print(listduty)
+listduty = listduty.rolling(window=win).sum() / win
+plt.plot(listduty)
+plt.xlabel('time (minutes)')
 
 print("END")
 plt.show()
