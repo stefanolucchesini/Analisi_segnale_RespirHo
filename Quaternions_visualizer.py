@@ -1,47 +1,49 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'ste13.txt'
+filename = 'test.txt'
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-
+plotquat = 1
+plotbatt = 0
 
 def plotupdate():
-    # CREAZIONE FINESTRA 1: QUATERNIONI E SEGNALE FILTRATO +PCA
-    plt.figure(1)
-    plt.clf()
-    plt.subplot(3, 1, 1)
-    plt.title('Quaternions of device 1')
-    plt.plot(tor['1'], color='red')
-    plt.plot(tor['2'], color='green')
-    plt.plot(tor['3'], color='skyblue')
-    plt.plot(tor['4'], color='orange')
-    plt.subplot(3, 1, 2)
-    plt.title('Quaternions of device 2')
-    plt.plot(abd['1'], color='red')
-    plt.plot(abd['2'], color='green')
-    plt.plot(abd['3'], color='skyblue')
-    plt.plot(abd['4'], color='orange')
-    plt.subplot(3, 1, 3)
-    plt.title('Quaternions of device 3')
-    plt.plot(ref['1'], color='red')
-    plt.plot(ref['2'], color='green')
-    plt.plot(ref['3'], color='skyblue')
-    plt.plot(ref['4'], color='orange')
-    plt.figure(2)
-    plt.clf()
-    plt.subplot(3, 1, 1)
-    plt.title('Battery voltage of device 1')
-    plt.plot(tor['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-    plt.ylim(top=2.65, bottom=1.5)
-    plt.subplot(3, 1, 2)
-    plt.title('Battery voltage of device 2')
-    plt.plot(abd['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-    plt.ylim(top=2.65, bottom=1.5)
-    plt.subplot(3, 1, 3)
-    plt.title('Battery voltage of device 3')
-    plt.plot(ref['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-    plt.ylim(top=2.65, bottom=1.5)
+    if plotquat:
+        plt.figure(1)
+        plt.clf()
+        plt.subplot(3, 1, 1)
+        plt.title('Quaternions of device 1')
+        plt.plot(tor['1'], color='red')
+        plt.plot(tor['2'], color='green')
+        plt.plot(tor['3'], color='skyblue')
+        plt.plot(tor['4'], color='orange')
+        plt.subplot(3, 1, 2)
+        plt.title('Quaternions of device 2')
+        plt.plot(abd['1'], color='red')
+        plt.plot(abd['2'], color='green')
+        plt.plot(abd['3'], color='skyblue')
+        plt.plot(abd['4'], color='orange')
+        plt.subplot(3, 1, 3)
+        plt.title('Quaternions of device 3')
+        plt.plot(ref['1'], color='red')
+        plt.plot(ref['2'], color='green')
+        plt.plot(ref['3'], color='skyblue')
+        plt.plot(ref['4'], color='orange')
+    if plotbatt:
+        plt.figure(2)
+        plt.clf()
+        plt.subplot(3, 1, 1)
+        plt.title('Battery voltage of device 1')
+        plt.plot(tor['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
+        plt.subplot(3, 1, 2)
+        plt.title('Battery voltage of device 2')
+        plt.plot(abd['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
+        plt.subplot(3, 1, 3)
+        plt.title('Battery voltage of device 3')
+        plt.plot(ref['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=1.5)
     return
 
 

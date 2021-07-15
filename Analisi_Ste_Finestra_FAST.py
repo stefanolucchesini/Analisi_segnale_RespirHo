@@ -1,16 +1,16 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'ste13.txt'
+filename = 'test.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
-window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). Original: 97
+window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 200  # number of initial samples to skip (samples PER device) e.g.: 200 will skip 600 samples in total
-stop = 0  # number of sample at which program execution will stop, 0 will run the whole txt file
+start = 0  # number of initial samples to skip (samples PER device)
+stop = 0  # number of sample at which program execution will stop, 0 will run the txt file to the end
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
-resp_param_plot = 1  # 1 enables plotting respiratory frequency, 0 disables it
+resp_param_plot = 1  # 1 enables plotting respiratory frequency and duty cycle, 0 disables it
 batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
 prediction_enabled = 0  # 1 enables posture prediction, 0 disables it
 # THRESHOLDS
@@ -186,12 +186,8 @@ f_Tot = [0]
 PCA_A, SD_A, PCA_T, SD_T, Tot_med, Tot_Iqr, indexes, predictions = [], [], [], [], [], [], [], []  #per plot parametri respiratori
 Min_Ind_Tot, Minima_Tot = [], []  #for plotting
 
-index_window = 0  # for computing things inside the window
-flag = 0  # used for plotting after first window is available
-
-index_data = 3 * start  # global index for total data
 length = len(data)
-ncycles = length if stop == 0 else 3*stop
+ncycles = length//3 if stop == 0 else stop
 print("Il dataset ha", length, "campioni")
 print("Skipping first", start, "data points")
 
@@ -293,7 +289,9 @@ ref['4'] = ref['4'].apply(lambda x: quatconv(x))
 tor = tor.drop(['C'], axis=1)
 abd = abd.drop(['C'], axis=1)
 ref = ref.drop(['C'], axis=1)
-
+tor = tor[start:]
+abd = abd[start:]
+ref = ref[start:]
 tor.fillna(method='bfill', inplace=True)
 tor = tor.reset_index(drop=True)
 abd.fillna(method='bfill', inplace=True)
@@ -304,11 +302,12 @@ index_tor = len(tor)
 index_abd = len(abd)
 index_ref = len(ref)
 #  PARTE ITERATIVA DEL CODICE
-while index_data < ncycles:
-    #print("GLOBAL INDEX:", index_data)
+first_iteration = 1
+index_window = 0
+while index_window < ncycles-window_size-start:
+    #print("index_window:", index_window)
     # INSIDE THE WINDOW
     # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
-    flag = 1  # time to plot
     # mean of thorax quat in window
     tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
                   statistics.mean(tor.iloc[index_window:index_window + window_size, 2]),
@@ -322,7 +321,7 @@ while index_data < ncycles:
                   statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
                   statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
                   statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-    if index_window == 0:
+    if first_iteration:
         Tor_pose, Ref_pose, Abd_pose = [], [], []
     while len(Tor_pose) <= max(len(tor), len(abd), len(ref)):
         Tor_pose.append(tor_pose_w)
@@ -399,7 +398,7 @@ while index_data < ncycles:
     # print(t1.isnull().values.any())
     newT = pca.fit_transform(t1.loc[index_window:index_window + window_size])  # PCA thorax. len(newT)= window_size!!
     newA = pca.fit_transform(a1.loc[index_window:index_window + window_size])  # PCA abdomen
-    if index_window == 0: #prima iterazione
+    if first_iteration: #prima iterazione
         FuseT_1 = newT
         FuseA_1 = newA
         EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
@@ -696,16 +695,12 @@ while index_data < ncycles:
         print("Errore calcolo parameteri totale:", e)
         Tot_med.append([np.nan, np.nan, np.nan, np.nan])
         Tot_Iqr.append([np.nan, np.nan, np.nan, np.nan])
-
-
-    index_data += 1  # global
-    if flag == 1:
-        flag = 0
-        #print("len indexes", len(indexes), "len tot med", len(Tot_med), "len tot PCA_A", len(PCA_A))
-        index_window += incr
-        #if index_window >= ncycles - index_window:  #mostra il grafico quando è quasi alla fine
-        #    plotupdate()
-        #    plt.pause(0.01)
+    first_iteration = 0
+    #print("len indexes", len(indexes), "len tot med", len(Tot_med), "len tot PCA_A", len(PCA_A))
+    index_window += incr
+    #if index_window >= ncycles - index_window:  #mostra il grafico quando è quasi alla fine
+    #    plotupdate()
+    #    plt.pause(0.01)
 
 
 #END OF WHILE CYCLE. Plot eventually remaining data
