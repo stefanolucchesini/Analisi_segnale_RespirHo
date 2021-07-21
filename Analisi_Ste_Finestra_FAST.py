@@ -1,11 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'ste13.txt'
+filename = 'Alessandra_2007.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 0  # number of initial samples to skip (samples PER device)
-stop = 0  # number of sample at which program execution will stop, 0 will run the txt file to the end
+start = 6000  # number of initial samples to skip (samples PER device)
+stop = 278000  # number of sample at which program execution will stop, 0 will run the txt file to the end
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
@@ -14,12 +14,9 @@ resp_param_plot = 1  # 1 enables plotting respiratory frequency and duty cycle, 
 batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
 prediction_enabled = 1  # 1 enables posture prediction, 0 disables it
 # THRESHOLDS
-static_f_threshold_max = 1  # Static, Cycling
-walking_f_threshold_max = 1  # 0.75
-static_f_threshold_min = 0.05
-walking_f_threshold_min = 0.2
-f_threshold_min = walking_f_threshold_min
-f_threshold_max = walking_f_threshold_max
+f_threshold_max = 0.75
+f_threshold_min = 0.05
+
 
 import pandas as pd
 import math
