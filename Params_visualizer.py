@@ -1,21 +1,20 @@
-win = 10
 globals().clear()
 import matplotlib.pyplot as plt
 import pandas as pd
 filename = 'total_params_out.csv'  #file contenente parametri respiratori calcolati
-win = 10  # window in time
+win = 10  # smooth window in time
 data = pd.read_csv(filename)
 data['index'] /= 600 #conversione in minuti
 #data['index'] /= 60 #conversione in ore
-print(data['index'])
+print(data)
 index = data['index']
 data = data.set_index('index')
 
-df = data[["duty_median_Abdomen", "duty_median_Thorax", "duty_median_Tot"]]
-df2 = data[["duty_median_Tot", "duty_median_Abdomen", "duty_median_Thorax"]]
+dutymedian = data[["duty_median_Tot", "duty_median_Abdomen", "duty_median_Thorax"]]
+titetor = data[["Ti_median_Thorax", "Te_median_Thorax"]]
 
 plt.figure(1)
-df.boxplot()
+plt.plot(titetor)
 
 plt.figure(2)
 plt.subplot(3, 1, 1)
@@ -45,13 +44,11 @@ plt.xlim(0)
 
 plt.figure(3)
 plt.title('minimum duty cycle')
-listduty = [min(df2.iloc[x, 0], df2.iloc[x, 1], df2.iloc[x, 2]) for x in range(len(index))]
+listduty = [min(dutymedian.iloc[x, 0], dutymedian.iloc[x, 1], dutymedian.iloc[x, 2]) for x in range(len(index))]
 listduty = pd.DataFrame(listduty, index=index)
-print(listduty)
 listduty = listduty.rolling(window=win).sum() / win
 plt.plot(listduty)
 plt.xlabel('time (minutes)')
-
 
 
 print("END")

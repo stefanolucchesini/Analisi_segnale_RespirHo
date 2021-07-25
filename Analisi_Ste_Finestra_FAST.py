@@ -1,11 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Alessandra_2007.txt'
+filename = 'gabri.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 6000  # number of initial samples to skip (samples PER device)
-stop = 278000  # number of sample at which program execution will stop, 0 will run the txt file to the end
+start = 2000  # number of initial samples to skip (samples PER device)
+stop = 226000  # number of sample at which program execution will stop, 0 will run the txt file to the end
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
@@ -29,6 +29,7 @@ from sklearn.decomposition import PCA
 import scipy.stats as stats
 import warnings
 import time
+
 if prediction_enabled:
     from keras.models import load_model
     test_model = load_model(r'..\Analisi del segnale\Classificatore\complete_GRU.h5')
@@ -161,7 +162,7 @@ else:
     print(data.iloc[-1, -6], "\\", data.iloc[-1, -5], "alle", data.iloc[-1, -4], ":",
           data.iloc[-1, -3], ":", data.iloc[-1, -2], ":", data.iloc[-1, -1])
 
-fdev = 10
+fdev = 10  #frequenza di sampling
 print("fdev:", round(fdev, 2), "Hz")
 # GLOBAL VARIABLES INITIALIZATION
 tor_pose = pd.DataFrame(columns=['1', '2', '3', '4'])
@@ -187,6 +188,7 @@ length = len(data)
 ncycles = length//3 if stop == 0 else stop
 print("Il dataset ha", length, "campioni")
 print("Skipping first", start, "data points")
+print("Stopping analysis at sample", ncycles)
 
 data = data.drop(['nthvalue'], axis=1)
 data['DevID'] = data['DevID'].astype(str)
@@ -283,7 +285,7 @@ ref.loc[ref['C'] == 'FF', ['4']] = np.nan
 ref['4'] = ref['4'].apply(lambda x: quatconv(x))
 
 #quaternioni belli belli, rimane solo da interpolarli
-tor = tor.drop(['C'], axis=1)
+tor = tor.drop(['C'], axis=1)  #il byte che identifica il data loss non serve più
 abd = abd.drop(['C'], axis=1)
 ref = ref.drop(['C'], axis=1)
 tor = tor[start:]
@@ -302,7 +304,7 @@ index_ref = len(ref)
 first_iteration = 1
 index_window = 0
 while index_window < ncycles-window_size-start:
-    #print("index_window:", index_window)
+    print("index_window", index_window)
     # INSIDE THE WINDOW
     # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
     # mean of thorax quat in window
@@ -392,21 +394,21 @@ while index_window < ncycles-window_size-start:
                                                                        center=True).mean()
     t1 = t1 - interp_T
     a1 = a1 - interp_A
-
     # print(t1.isnull().values.any())
     newT = pca.fit_transform(t1.loc[index_window:index_window + window_size])  # PCA thorax. len(newT)= window_size!!
     newA = pca.fit_transform(a1.loc[index_window:index_window + window_size])  # PCA abdomen
+    #print("len newt and newa", len(newT), len(newA))
     if first_iteration: #prima iterazione
-        FuseT_1 = newT
+        FuseT_1 = newT  # serve dalla seconda iterazione in poi
         FuseA_1 = newA
-        EstimSmoothT = scipy.signal.savgol_filter(np.ravel(FuseT_1), SgolayWindowPCA, 3)  # filtra il segnale
-        EstimSmoothA = scipy.signal.savgol_filter(np.ravel(FuseA_1), SgolayWindowPCA, 3)
+        EstimSmoothT = scipy.signal.savgol_filter(np.ravel(newT), SgolayWindowPCA, 3)  # filtra il segnale
+        EstimSmoothA = scipy.signal.savgol_filter(np.ravel(newA), SgolayWindowPCA, 3)
     else:
         FuseT_1 = np.append(FuseT_1, newT[window_size - incr:])  # adds last elements of the computed PCA array
         FuseA_1 = np.append(FuseA_1, newA[window_size - incr:])
         EstimSmoothT = np.append(EstimSmoothT, scipy.signal.savgol_filter(np.ravel(newT[window_size - incr:]), SgolayWindowPCA, 3))  # filtra il segnale
         EstimSmoothA = np.append(EstimSmoothA, scipy.signal.savgol_filter(np.ravel(newA[window_size - incr:]), SgolayWindowPCA, 3))
-    # print("Fuse T len", len(FuseT_1), "\nFuse A len", len(FuseA_1))
+    #print("len first pc tor", len(EstimSmoothT), "\nlen first pc abd", len(EstimSmoothA))
     try:
         # PEAK DETECTION
         # Thorax
@@ -420,12 +422,8 @@ while index_window < ncycles-window_size-start:
                 intrapeak = (Index_T[i + 1] - Index_T[i]) / fdev
                 fstim = 1 / intrapeak
                 fStimVec_T.append(fstim)
-            if len(fStimVec_T) > 1200:
-                fStimMean_T = statistics.mean(fStimVec_T[-1200:])  # trova picchi sugli ultimi 2 minuti
-                fStimstd_T = statistics.stdev(fStimVec_T[-1200:])
-            else:
-                fStimMean_T = statistics.mean(fStimVec_T)
-                fStimstd_T = statistics.stdev(fStimVec_T)
+            fStimMean_T = statistics.mean(fStimVec_T)
+            fStimstd_T = statistics.stdev(fStimVec_T)
             lowThreshold_T = max(f_threshold_min, (fStimMean_T - fStimstd_T))  # creation of the thorax threshold
             #print("lowThreshold_T", lowThreshold_T)
             f_T, pxx_T = scipy.signal.welch(np.ravel(FuseT_1), window='hamming', fs=10, nperseg=window_size, noverlap=incr,
@@ -446,12 +444,8 @@ while index_window < ncycles-window_size-start:
                 intrapeak = (Index_A[i + 1] - Index_A[i]) / fdev
                 fstim = 1 / intrapeak  # intrapeak distance is used to estimate the frequency
                 fStimVec_A.append(fstim)
-            if len(fStimVec_A) > 1200:
-                fStimMean_A = statistics.mean(fStimVec_A[-1200:]) # trova picchi sugli ultimi 2 minuti
-                fStimstd_A = statistics.stdev(fStimVec_A[-1200:])
-            else:
-                fStimMean_A = statistics.mean(fStimVec_A)
-                fStimstd_A = statistics.stdev(fStimVec_A)
+            fStimMean_A = statistics.mean(fStimVec_A)
+            fStimstd_A = statistics.stdev(fStimVec_A)
             lowThreshold_A = max(f_threshold_min, (fStimMean_A - fStimstd_A))  # creation of the abdomen threshold
             #print("lowThreshold_A", lowThreshold_A)
             f_A, pxx_A = scipy.signal.welch(np.ravel(FuseA_1), fs=fdev, window='hamming', nperseg=window_size, noverlap=incr,
@@ -581,7 +575,6 @@ while index_window < ncycles-window_size-start:
         PCA_A.append([fBmedian_A, Timedian_A, Temedian_A, duty_median_A])
         indexes.append(index_window)
         SD_A.append([fBstd_A, Tistd_A, Testd_A, duty_std_A])
-        print("index_window", index_window)
         print("fBmedian_Abdomen, Ti_median_Abdomen, Te_median_Abdomen, duty_median_Abdomen\n", [round(i, 2) for i in PCA_A[-1]])
         print("fBirq_Abdomen, Tiirq_Abdomen, Teirq_Abdomen, duty_irq_Abdomen\n", [round(i, 2) for i in SD_A[-1]], "\n")
     except Exception as e:

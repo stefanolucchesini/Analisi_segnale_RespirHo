@@ -1,11 +1,13 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'test.txt'
+filename = 'gabri.txt'
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-plotquat = 1
-plotbatt = 0
+
+plotquat = 1  #plot quaternioni
+plotbatt = 0  #plot tensione batterie
+timeinminutes = 0 #1: grafici in minuti, 0: grafici in numero di campioni (1 min = 600 campioni)
 
 def plotupdate():
     if plotquat:
@@ -17,18 +19,30 @@ def plotupdate():
         plt.plot(tor['2'], color='green')
         plt.plot(tor['3'], color='skyblue')
         plt.plot(tor['4'], color='orange')
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
         plt.subplot(3, 1, 2)
         plt.title('Quaternions of device 2')
         plt.plot(abd['1'], color='red')
         plt.plot(abd['2'], color='green')
         plt.plot(abd['3'], color='skyblue')
         plt.plot(abd['4'], color='orange')
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
         plt.subplot(3, 1, 3)
         plt.title('Quaternions of device 3')
         plt.plot(ref['1'], color='red')
         plt.plot(ref['2'], color='green')
         plt.plot(ref['3'], color='skyblue')
         plt.plot(ref['4'], color='orange')
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
     if plotbatt:
         plt.figure(2)
         plt.clf()
@@ -166,5 +180,12 @@ abd = abd.reset_index(drop=True)
 ref.fillna(method='bfill', inplace=True)
 ref = ref.reset_index(drop=True)
 
+if timeinminutes:
+    #conversione indice in minuti
+    tor.index /= 600
+    abd.index /= 600
+    ref.index /= 600
+
+print("END")
 plotupdate()
 plt.show()
