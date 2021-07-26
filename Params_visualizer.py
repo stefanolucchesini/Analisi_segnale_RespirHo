@@ -1,12 +1,12 @@
 globals().clear()
 import matplotlib.pyplot as plt
 import pandas as pd
-filename = 'total_params_out.csv'  #file contenente parametri respiratori calcolati
+filename = 'ste13.csv'  #file contenente parametri respiratori calcolati
 win = 10  # smooth window in time
 data = pd.read_csv(filename)
 data['index'] /= 600 #conversione in minuti
 #data['index'] /= 60 #conversione in ore
-print(data)
+#print(data)
 index = data['index']
 data = data.set_index('index')
 

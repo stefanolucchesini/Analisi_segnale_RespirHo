@@ -1,11 +1,11 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'gabri.txt'
+filename = 'Andrea_23072021_C.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
-start = 2000  # number of initial samples to skip (samples PER device)
-stop = 226000  # number of sample at which program execution will stop, 0 will run the txt file to the end
+start = 0  # number of initial samples to skip (samples PER device)
+stop = 0  # number of sample at which program execution will stop, 0 will run the txt file to the end
 incr = 300  # Overlapping between a window and the following. 1=max overlap. MUST BE >= SgolayWindowPCA. The higher the faster
 # PLOTTING & COMPUTING OPTIONS
 w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
@@ -303,36 +303,35 @@ index_ref = len(ref)
 #  PARTE ITERATIVA DEL CODICE
 first_iteration = 1
 index_window = 0
-while index_window < ncycles-window_size-start:
-    print("index_window", index_window)
-    # INSIDE THE WINDOW
-    # print("index_tor", index_tor, "index_abd", index_abd, "index_ref", index_ref)
-    # mean of thorax quat in window
-    tor_pose_w = [statistics.mean(tor.iloc[index_window:index_window + window_size, 1]),
-                  statistics.mean(tor.iloc[index_window:index_window + window_size, 2]),
-                  statistics.mean(tor.iloc[index_window:index_window + window_size, 3]),
-                  statistics.mean(tor.iloc[index_window:index_window + window_size, 4])]
-    abd_pose_w = [statistics.mean(abd.iloc[index_window:index_window + window_size, 1]),
-                  statistics.mean(abd.iloc[index_window:index_window + window_size, 2]),
-                  statistics.mean(abd.iloc[index_window:index_window + window_size, 3]),
-                  statistics.mean(abd.iloc[index_window:index_window + window_size, 4])]
-    ref_pose_w = [statistics.mean(ref.iloc[index_window:index_window + window_size, 1]),
-                  statistics.mean(ref.iloc[index_window:index_window + window_size, 2]),
-                  statistics.mean(ref.iloc[index_window:index_window + window_size, 3]),
-                  statistics.mean(ref.iloc[index_window:index_window + window_size, 4])]
-    if first_iteration:
-        Tor_pose, Ref_pose, Abd_pose = [], [], []
-    while len(Tor_pose) <= max(len(tor), len(abd), len(ref)):
+
+# mean of thorax quat in window
+tor_pose_w = [statistics.mean(tor.iloc[:, 1]),
+              statistics.mean(tor.iloc[:, 2]),
+              statistics.mean(tor.iloc[:, 3]),
+              statistics.mean(tor.iloc[:, 4])]
+abd_pose_w = [statistics.mean(abd.iloc[:, 1]),
+              statistics.mean(abd.iloc[:, 2]),
+              statistics.mean(abd.iloc[:, 3]),
+              statistics.mean(abd.iloc[:, 4])]
+ref_pose_w = [statistics.mean(ref.iloc[:, 1]),
+              statistics.mean(ref.iloc[:, 2]),
+              statistics.mean(ref.iloc[:, 3]),
+              statistics.mean(ref.iloc[:, 4])]
+Tor_pose, Ref_pose, Abd_pose = [], [], []
+while len(Tor_pose) <= max(len(tor), len(abd), len(ref)):
         Tor_pose.append(tor_pose_w)
         Ref_pose.append(ref_pose_w)
         Abd_pose.append(abd_pose_w)
-    # takes the 4 quaternions, excludes battery voltage and timestamps
-    tor_array.extend(tor.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-    ref_array.extend(ref.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
-    abd_array.extend(abd.iloc[index_window:index_window + window_size, 1:5].rename_axis().values)
+# takes the 4 quaternions, excludes battery voltage and timestamps
+tor_array = tor.iloc[:, 1:5].rename_axis().values
+ref_array = ref.iloc[:, 1:5].rename_axis().values
+abd_array = abd.iloc[:, 1:5].rename_axis().values
+
+while index_window < ncycles-window_size-start:
+    print("index_window", index_window)
     #CLASSIFICATION
     if prediction_enabled:
-        input = pd.DataFrame(ref_array[index_window:])  #classifica su finestra
+        input = pd.DataFrame(ref_array[index_window:index_window+window_size])  #classifica su finestra
         N_TIME_STEPS = 200
         N_FEATURES = 4
         step = 20
@@ -357,33 +356,29 @@ while index_window < ncycles-window_size-start:
 
     for i in range(index_window, index_window + window_size):  # campione per campione DENTRO finestra
         # THORAX QUATERNION COMPUTATION
-        try:
-            tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
-            Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
-            tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
-            tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
-            # ABDOMEN QUATERNION COMPUTATION
-            abd_quat = Quaternion(abd_array[i])
-            Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
-            abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
-            abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
-            # REFERENCE QUATERNION COMPUTATION
-            ref_quat = Quaternion(ref_array[i])
-            Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
-            ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
-            ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
-            # THORAX COMPONENT
-            Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
-            Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
-            t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-            t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
-            # ABDOMEN COMPONENT
-            Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
-            a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
-            a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
-        except Exception as e:
-            print("Quatenions error:", e)
-
+        tor_quat = Quaternion(tor_array[i])  #thorax quat wrt Earth
+        Tor_pose_quat = Quaternion(Tor_pose[i])  # quaternion
+        tor_pose_row = tor_quat * Tor_pose_quat.conjugate  # quaternion product
+        tor_pose.loc[i] = [tor_pose_row[0], tor_pose_row[1], tor_pose_row[2], tor_pose_row[3]]
+        # ABDOMEN QUATERNION COMPUTATION
+        abd_quat = Quaternion(abd_array[i])
+        Abd_pose_quat = Quaternion(Abd_pose[i])  # quaternion
+        abd_pose_row = abd_quat * Abd_pose_quat.conjugate  # quaternion product
+        abd_pose.loc[i] = [abd_pose_row[0], abd_pose_row[1], abd_pose_row[2], abd_pose_row[3]]
+        # REFERENCE QUATERNION COMPUTATION
+        ref_quat = Quaternion(ref_array[i])
+        Ref_pose_quat = Quaternion(Ref_pose[i])  # for quaternion conjugate
+        ref_pose_row = ref_quat * Ref_pose_quat.conjugate  # quaternion product
+        ref_pose.loc[i] = [ref_pose_row[0], ref_pose_row[1], ref_pose_row[2], ref_pose_row[3]]
+        # THORAX COMPONENT
+        Tor_Ok_quat = Quaternion(tor_pose.loc[i].rename_axis().values)
+        Ref_Ok_quat = Quaternion(ref_pose.loc[i].rename_axis().values)
+        t1_row = Tor_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+        t1.loc[i] = [t1_row[0], t1_row[1], t1_row[2], t1_row[3]]
+        # ABDOMEN COMPONENT
+        Abd_Ok_quat = Quaternion(abd_pose.loc[i].rename_axis().values)
+        a1_row = Abd_Ok_quat * Ref_Ok_quat.conjugate  # referred to the reference
+        a1.loc[i] = [a1_row[0], a1_row[1], a1_row[2], a1_row[3]]
 
     # fine del calcolo dentro la finestra
     interp_T = t1.loc[index_window:index_window + window_size].rolling(window_size,
