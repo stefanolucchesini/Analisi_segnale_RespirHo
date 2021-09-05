@@ -1,7 +1,8 @@
 globals().clear()
 import matplotlib.pyplot as plt
 import pandas as pd
-filename = 'ste13.csv'  #file contenente parametri respiratori calcolati
+import statistics
+filename = 'rina10.csv'  #file contenente parametri respiratori calcolati
 win = 10  # smooth window in time
 data = pd.read_csv(filename)
 data['index'] /= 600 #conversione in minuti
@@ -11,10 +12,10 @@ index = data['index']
 data = data.set_index('index')
 
 dutymedian = data[["duty_median_Tot", "duty_median_Abdomen", "duty_median_Thorax"]]
-titetor = data[["Ti_median_Thorax", "Te_median_Thorax"]]
+titetor = data["Ti_median_Thorax"]
 
 plt.figure(1)
-plt.plot(titetor)
+plt.boxplot(titetor)
 
 plt.figure(2)
 plt.subplot(3, 1, 1)
@@ -51,5 +52,11 @@ plt.plot(listduty)
 plt.xlabel('time (minutes)')
 
 
+print('Tor median and iqr:',statistics.median(data["fB_median_Thorax"]), statistics.median(data['fBirq_Thorax']))
+print('Abd median and iqr:',statistics.median(data["fBmedian_Abdomen"]), statistics.median(data['fBirq_Abd']))
+print('Total median and iqr:',statistics.median(data["fB_median_Tot"]), statistics.median(data['fBirq_Tot']))
+print('Tor DUTY and iqr:',statistics.median(data["duty_median_Thorax"]), statistics.median(data['duty_irq_Thorax']))
+print('Abd DUTY and iqr:',statistics.median(data["duty_median_Abdomen"]), statistics.median(data['duty_irq_Abd']))
+print('Total DUTY and iqr:',statistics.median(data["duty_median_Tot"]), statistics.median(data['duty_irq_Tot']))
 print("END")
 plt.show()

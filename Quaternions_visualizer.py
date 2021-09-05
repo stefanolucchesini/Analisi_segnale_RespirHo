@@ -1,13 +1,14 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'gabri.txt'
+filename = 'paola11.txt'
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
 plotquat = 1  #plot quaternioni
-plotbatt = 0  #plot tensione batterie
-timeinminutes = 0 #1: grafici in minuti, 0: grafici in numero di campioni (1 min = 600 campioni)
+plotbatt = 1  #plot tensione batterie
+timeinminutes = 1 #1: grafici in minuti, 0: grafici in numero di campioni (1 min = 600 campioni)
+winbatt = 1200
 
 def plotupdate():
     if plotquat:
@@ -48,16 +49,31 @@ def plotupdate():
         plt.clf()
         plt.subplot(3, 1, 1)
         plt.title('Battery voltage of device 1')
-        plt.plot(tor['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-        plt.ylim(top=2.65, bottom=1.5)
+        plt.plot(tor['B'].rolling(window=winbatt).sum() / winbatt * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=2.3)
+        #plt.xlim(0, 500)
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
         plt.subplot(3, 1, 2)
         plt.title('Battery voltage of device 2')
-        plt.plot(abd['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-        plt.ylim(top=2.65, bottom=1.5)
+        plt.plot(abd['B'].rolling(window=winbatt).sum() / winbatt * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=2.3)
+        #plt.xlim(0, 500)
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
         plt.subplot(3, 1, 3)
         plt.title('Battery voltage of device 3')
-        plt.plot(ref['B'].rolling(window=5).sum() / 5 * 1881 / 69280, color='red')
-        plt.ylim(top=2.65, bottom=1.5)
+        plt.plot(ref['B'].rolling(window=winbatt).sum() / winbatt * 1881 / 69280, color='red')
+        plt.ylim(top=2.65, bottom=2.3)
+        #plt.xlim(0, 500)
+        if timeinminutes:
+            plt.xlabel('time (minutes)')
+        else:
+            plt.xlabel('time (samples)')
     return
 
 

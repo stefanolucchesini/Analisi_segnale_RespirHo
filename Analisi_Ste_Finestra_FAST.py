@@ -1,6 +1,6 @@
 globals().clear()
 # PARAMETERS SELECTION
-filename = 'Andrea_23072021_C.txt'
+filename = 'paola11.txt'
 #A:sit.wo.su, B:sit, C:supine, D:prone, E:lyingL, F:lyingR, G:standing, I:stairs, L:walkS, M:walkF, N:run, O:cyclette
 window_size = 600  # samples inside the window (Must be >=SgolayWindowPCA). 1 minute = 600 samples
 SgolayWindowPCA = 31  # original: 31.  MUST BE AN ODD NUMBER
@@ -12,7 +12,7 @@ w1plot = 1  # 1 enables plotting quaternions and PCA, 0 disables it
 w2plot = 1  # 1 enables plotting respiratory signals and spectrum, 0 disables it
 resp_param_plot = 1  # 1 enables plotting respiratory frequency and duty cycle, 0 disables it
 batteryplot = 1  # 1 enables plotting battery voltages, 0 disables it
-prediction_enabled = 1  # 1 enables posture prediction, 0 disables it
+prediction_enabled = 0  # 1 enables posture prediction, 0 disables it
 # THRESHOLDS
 f_threshold_max = 0.75
 f_threshold_min = 0.05
